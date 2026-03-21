@@ -10242,7 +10242,7 @@ const API = (() => {
     if (!_online || !_token) return;
     setIndicator('syncing');
     try {
-      const [ofs, devis, stock, saisies, planning, controles, consos] = await Promise.all([
+      const [ofs, devis, stock, saisies, planning, controles, consos, salaries] = await Promise.all([
         request('GET', '/api/of'),
         request('GET', '/api/devis'),
         request('GET', '/api/stock'),
@@ -10250,6 +10250,7 @@ const API = (() => {
         request('GET', '/api/planning'),
         request('GET', '/api/controles'),
         request('GET', '/api/conso-poudre'),
+        request('GET', '/api/salaries'),
       ]);
       if (ofs && Object.keys(ofs).length) {
         Object.assign(OF_DATA, ofs);
@@ -10264,6 +10265,7 @@ const API = (() => {
       if (planning?.length) { planningTaches.length=0;      planning.forEach(t => planningTaches.push(t)); }
       if (controles?.length){ HISTORIQUE_CONTROLE.length=0; controles.forEach(c => HISTORIQUE_CONTROLE.push(c)); }
       if (consos?.length)   { HISTORIQUE_CONSO.length=0;    consos.forEach(c => HISTORIQUE_CONSO.push(c)); }
+      if (salaries?.length) { SALARIES_APP.length=0;         salaries.forEach(s => SALARIES_APP.push(s)); buildLoginScreen(); }
 
       renderOFTable(); renderPlanning(); renderStock();
       renderDevis(); renderAnalyse(); renderRH(); updateOFBadge();
@@ -10282,7 +10284,13 @@ const API = (() => {
   }
   setInterval(flushQueue, 30000);
 
-  return { loginPin, save, post, loadAll, isOnline: () => _online, setIndicator };
+  async function syncSalaries() {
+    if (!_online || !_token) return;
+    try { await request('PUT', '/api/salaries', SALARIES_APP); }
+    catch(e) { console.warn('Sync salariés échoué:', e); }
+  }
+
+  return { loginPin, save, post, loadAll, isOnline: () => _online, setIndicator, _syncSalaries: syncSalaries };
 })();
 
 const _connecterOrig = connecter;
@@ -10294,6 +10302,8 @@ window.connecter = async function(role) {
 const _connecterParPinOrig = connecterParPin;
 window.connecterParPin = async function(pin) {
   _connecterParPinOrig(pin);
+  // D'abord synchro les salariés vers le backend (pour que leurs PINs soient connus)
+  try { await API._syncSalaries(); } catch(e) {}
   // Se connecter au backend avec le vrai PIN saisi
   const ok = await API.loginPin(pin);
   if (ok) {

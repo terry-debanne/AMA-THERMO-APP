@@ -10288,9 +10288,18 @@ const API = (() => {
 const _connecterOrig = connecter;
 window.connecter = async function(role) {
   _connecterOrig(role);
-  const pins = { admin:'1234', resp_prod:'2580', operateur:'1111' };
-  const ok = await API.loginPin(pins[role]);
-  if (ok) await API.loadAll();
+};
+
+// Patch principal : intercepter connecterParPin qui est appelé dans TOUS les cas de login
+const _connecterParPinOrig = connecterParPin;
+window.connecterParPin = async function(pin) {
+  _connecterParPinOrig(pin);
+  // Se connecter au backend avec le vrai PIN saisi
+  const ok = await API.loginPin(pin);
+  if (ok) {
+    await API.loadAll();
+    showToast('☁️ Synchronisé avec le serveur', 'var(--success)');
+  }
 };
 
 const _renderOFOrig = renderOFTable;

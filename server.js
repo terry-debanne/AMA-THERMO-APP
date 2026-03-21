@@ -30,6 +30,12 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS salaries (
+    id       INTEGER PRIMARY KEY,
+    data     TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS users (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     role     TEXT NOT NULL UNIQUE,
@@ -167,6 +173,43 @@ app.put('/api/auth/pin', authMiddleware, (req, res) => {
   const hash = bcrypt.hashSync(String(newPin), 10);
   db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?').run(hash, req.user.id);
   res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROUTES SALARIÉS
+// ═══════════════════════════════════════════════════════
+
+// GET /api/salaries — récupérer tous les salariés
+app.get('/api/salaries', authMiddleware, (req, res) => {
+  const rows = db.prepare('SELECT data FROM salaries ORDER BY id ASC').all();
+  res.json(rows.map(r => JSON.parse(r.data)));
+});
+
+// PUT /api/salaries — sync complète (tableau de salariés)
+app.put('/api/salaries', authMiddleware, (req, res) => {
+  const salaries = Array.isArray(req.body) ? req.body : [];
+  const upsert = db.prepare(`
+    INSERT INTO salaries (id, data, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+  `);
+  const syncAll = db.transaction((list) => {
+    for (const s of list) upsert.run(s.id, JSON.stringify(s));
+  });
+  syncAll(salaries);
+
+  // Mettre à jour les users (PIN) pour chaque salarié
+  const upsertUser = db.prepare(`
+    INSERT INTO users (role, pin_hash, nom) VALUES (?, ?, ?)
+    ON CONFLICT(role) DO UPDATE SET pin_hash = excluded.pin_hash, nom = excluded.nom
+  `);
+  for (const s of salaries) {
+    if (s.pin && s.actif) {
+      const nom = s.prenom ? s.prenom + ' ' + s.nom : s.nom;
+      upsertUser.run(s.role + '_' + s.id, bcrypt.hashSync(String(s.pin), 10), nom);
+    }
+  }
+
+  res.json({ ok: true, count: salaries.length });
 });
 
 // ═══════════════════════════════════════════════════════

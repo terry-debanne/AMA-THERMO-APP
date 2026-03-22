@@ -456,27 +456,6 @@ app.delete('/api/salaries-app/reset', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Route diagnostic temporaire
-app.get('/api/diag', (req, res) => {
-  try {
-    const salaries = db.prepare('SELECT id, nom, prenom, role, actif, data FROM salaries ORDER BY id').all();
-    const appData = db.prepare('SELECT key FROM app_data').all();
-    res.json({ salaries: salaries.map(s => ({id:s.id, nom:s.nom, role:s.role, actif:s.actif, hasPin: !!(s.data && JSON.parse(s.data||'{}').pin)})), appData: appData.map(r=>r.key) });
-  } catch(e) { res.status(500).json({error:e.message}); }
-});
-
-// Nettoyer doublons salariés
-app.get('/api/cleanup', (req, res) => {
-  if (req.query.key !== 'THERMO2026') return res.status(403).json({error:'Clé incorrecte'});
-  try {
-    // Garder uniquement l'admin id:1, supprimer tout le reste
-    db.prepare('DELETE FROM salaries WHERE id != 1').run();
-    db.prepare('DELETE FROM app_data WHERE key = ?').run('SALARIES_APP');
-    const rows = db.prepare('SELECT id, nom, role FROM salaries').all();
-    res.json({ ok: true, remaining: rows });
-  } catch(e) { res.status(500).json({error:e.message}); }
-});
-
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.use((req, res) => res.status(404).json({ error: 'Route inconnue' }));

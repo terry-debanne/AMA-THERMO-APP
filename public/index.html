@@ -10324,20 +10324,16 @@ async function loginAdmin() {
   // Charger toutes les données
   await API.loadAll();
 
-  // Connecter avec le profil admin
-  const adminSal = SALARIES_APP.find(x => x.role === 'admin' && x.actif);
-  if (adminSal) {
-    if (!adminSal.pin) adminSal.pin = pin;
-    connecterParPin(pin);
-  } else {
-    currentRole = 'admin';
-    currentProfilPin = pin;
-    _connecterAvecProfil({
-      id:1, nom:'Admin', initiales:'AD', role:'admin',
-      roleLabel:'⚡ Admin', couleur:'var(--blue-mid)', pin,
-      nav: NAV_PAR_ROLE.admin
-    }, {id:1, nom:'Admin', role:'admin', pin, actif:true});
-  }
+  // Connecter directement — pas besoin de chercher par PIN
+  const adminSal = SALARIES_APP.find(x => x.role === 'admin' && x.actif) || {id:1, nom:'Admin', prenom:'', initiales:'AD', role:'admin', couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:''};
+  if (!adminSal.pin) adminSal.pin = pin;
+  currentRole = 'admin';
+  currentProfilPin = pin;
+  _connecterAvecProfil({
+    id: adminSal.id, nom: adminSal.prenom ? adminSal.prenom+' '+adminSal.nom : adminSal.nom,
+    initiales: adminSal.initiales || 'AD', role: 'admin', roleLabel: '⚡ Admin',
+    couleur: adminSal.couleur || 'var(--blue-mid)', pin, nav: NAV_PAR_ROLE.admin
+  }, adminSal);
   showToast('☁️ Connecté', 'var(--success)');
 }
 
@@ -10505,17 +10501,17 @@ const API = (() => {
 // ── Patch connexion : login local + Railway ───────────────────────────────
 const _connecterParPinOrig = connecterParPin;
 window.connecterParPin = async function(pin) {
-  // 1. Login serveur d'abord
   const ok = await API.login(pin);
   if (ok) {
-    // 2. Charger toutes les données (y compris SALARIES_APP avec vrais PINs)
     await API.loadAll();
-    // 3. Connexion locale avec le vrai profil
-    const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
+    // Assigner le PIN au salarié correspondant s'il est manquant
+    const sals = SALARIES_APP.filter(x => x.actif && x.id > 0 && x.id < 999);
+    let s = sals.find(x => x.pin === pin);
+    if (!s && sals.length === 1) { s = sals[0]; s.pin = pin; }
+    if (!s) { s = sals.find(x => x.role === 'admin'); if (s) s.pin = pin; }
     if (s) _connecterParPinOrig(pin);
     showToast('☁️ Synchronisé avec Railway', 'var(--success)');
   } else {
-    // Hors ligne : connexion locale uniquement
     _connecterParPinOrig(pin);
   }
 };

@@ -4776,6 +4776,8 @@ function confirmerSaisiePoudre() {
   renderStock();
   renderDevis();
   closeModal('modal-saisie-poudre');
+  API.save('/api/stock', STOCK_DATA);
+  if (HISTORIQUE_CONSO.length) API.post('/api/conso-poudre', HISTORIQUE_CONSO[0]);
 
   const ofsLabel = ofs.join(', ');
   showToast(`🎨 ${qte.toFixed(2)} kg RAL ${item.ral} · ${ofsLabel} → reste ${item.quantite.toFixed(2)} kg`, 'var(--success)');
@@ -5843,6 +5845,9 @@ function creerOF(mode) {
 
   // Maintenant rendre le tableau (OF_DATA est à jour)
   renderOFTable();
+
+  // Sauvegarder sur Railway
+  API.save('/api/of/' + ref, OF_DATA[ref]);
 
   // Ajouter à la liste des OF du chrono
   OF_EN_COURS.unshift({ ref, client, etat: mode==='brouillon'?'Brouillon':'Préparation', urgence: isUrgent });
@@ -7087,6 +7092,7 @@ function appliquerEtatOF(ref, nouvelEtat, selectEl, ancienEtat) {
   if (!of) return;
   of.etat      = nouvelEtat;
   of.etatBadge = ETATS_OF[nouvelEtat]?.badge || 'badge-gray';
+  API.save('/api/of/' + ref, of);
   if (selectEl) {
     selectEl.value = nouvelEtat;
     const cfg = ETATS_OF[nouvelEtat];
@@ -7710,6 +7716,7 @@ function sauvegarderClient() {
   }
   closeModal('modal-new-client');
   renderClients();
+  API.save('/api/clients', CLIENTS_DATA);
 }
 
 function supprimerClient(id) {
@@ -7718,6 +7725,7 @@ function supprimerClient(id) {
   if (!confirm(`Supprimer "${c.societe}" ?`)) return;
   CLIENTS_DATA.splice(CLIENTS_DATA.findIndex(x=>x.id===id), 1);
   renderClients();
+  API.save('/api/clients', CLIENTS_DATA);
   showToast(`🗑 ${c.societe} supprimé`, 'var(--danger)');
 }
 
@@ -7771,6 +7779,7 @@ function ajouterFournisseur() {
   FOURNISSEURS.push({ id: nextFournId++, nom });
   input.value = '';
   renderFournisseurs();
+  API.save('/api/fournisseurs', FOURNISSEURS);
   showToast(`✅ ${nom} ajouté`, 'var(--success)');
 }
 
@@ -7780,6 +7789,7 @@ function supprimerFournisseur(id) {
   if (!confirm(`Supprimer "${f.nom}" ?`)) return;
   FOURNISSEURS = FOURNISSEURS.filter(x => x.id !== id);
   renderFournisseurs();
+  API.save('/api/fournisseurs', FOURNISSEURS);
   showToast(`🗑 ${f.nom} supprimé`, 'var(--danger)');
 }
 
@@ -7861,6 +7871,7 @@ function validerControle() {
     note:document.getElementById('controle-note')?.value?.trim()||'',
   });
   closeModal('modal-controle-epaisseur');
+  if (HISTORIQUE_CONTROLE.length) API.post('/api/controles', HISTORIQUE_CONTROLE[0]);
   showToast(`${conforme?'✅':'⚠️'} Contrôle épaisseur — Moy: ${moy}µm · ${conforme?'Conforme':'Non conforme'}`,
     conforme?'var(--success)':'var(--warning)');
 }
@@ -8091,6 +8102,7 @@ function sauvegarderDevis() {
     const newRef = `${_devisEnEdition.replace(/-v\d+$/, '')}-v${nouvelleVersion}`;
     if (ancien) { ancien.etat='Remplacé'; ancien.remplacePar=newRef; }
     DEVIS_DATA.unshift({ ref:newRef, version:nouvelleVersion, client, contact, date:dateStr, validite:validiteStr, montant, etat:'Brouillon', ofRef:null, remplacePar:null, motif, lignes:[...lignesDevis] });
+  API.save('/api/devis/' + newRef, DEVIS_DATA[0]);
     closeModal('modal-new-devis');
     renderDevis();
     showToast(`📋 ${newRef} créé (v${nouvelleVersion})`, '#7c3aed');
@@ -8101,6 +8113,7 @@ function sauvegarderDevis() {
     DEVIS_DATA.unshift({ ref, version:1, client, contact, date:dateStr, validite:validiteStr, montant, etat:'Brouillon', ofRef:null, remplacePar:null, motif:'', lignes:[...lignesDevis] });
     closeModal('modal-new-devis');
     renderDevis();
+    API.save('/api/devis/' + ref, DEVIS_DATA[0]);
     showToast(`✅ ${ref} créé`, '#7c3aed');
   }
   lignesDevis = [];
@@ -8408,6 +8421,7 @@ function supprimerLot(stockId, lotId) {
     item.peremption = item.lotsDetail.reduce((min, l) => l.peremption < min ? l.peremption : min, item.lotsDetail[0].peremption);
   renderStockDetailLots(item);
   renderStock();
+  API.save('/api/stock', STOCK_DATA);
   renderDevis();
   showToast(`🗑 Lot supprimé`, 'var(--gray-600)');
 }
@@ -8558,6 +8572,7 @@ function creerCouleurStock() {
 
   closeModal('modal-new-stock');
   renderStock();
+  API.save('/api/stock', STOCK_DATA);
   showToast(`✅ RAL ${ral} ${nom} ${fin} créé`, 'var(--success)');
 
   // Vider le formulaire
@@ -8661,6 +8676,7 @@ function confirmerAjustement() {
   renderStock();
   renderDevis();
   closeModal('modal-ajuster-stock');
+  API.save('/api/stock', STOCK_DATA);
   showToast(`⬇️ RAL ${item.ral} — ${qte.toFixed(2)} kg déduits du lot ${lot.numero} · reste ${item.quantite.toFixed(2)} kg`, 'var(--orange)');
 
   // Si le lot tombe à 0, demander confirmation
@@ -8674,6 +8690,7 @@ function supprimerStock(id) {
   const idx = STOCK_DATA.findIndex(i => i.id === id);
   STOCK_DATA.splice(idx, 1);
   renderStock();
+  API.save('/api/stock', STOCK_DATA);
   renderDevis();
   showToast(`🗑 RAL ${item.ral} supprimé`, 'var(--gray-600)');
 }

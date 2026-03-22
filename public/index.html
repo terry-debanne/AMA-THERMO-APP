@@ -6486,50 +6486,62 @@ function sauvegarderSalarie() {
   // Couleur selon le rôle
   const couleur = role === 'admin' ? 'var(--blue-mid)' : role === 'resp_prod' ? '#7c3aed' : '#0891b2';
 
-  if (_salarieEditId) {
-    // Modifier localement
-    const idx = SALARIES_APP.findIndex(s => s.id === _salarieEditId);
-    if (idx !== -1) {
-      SALARIES_APP[idx] = { ...SALARIES_APP[idx], nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur };
-    }
-  } else {
-    // Calculer le prochain id depuis SALARIES_APP existant
-    const maxId = SALARIES_APP.reduce((m, s) => Math.max(m, s.id||0), 0);
-    const newId = maxId + 1;
-    SALARIES_APP.push({ id: newId, nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur });
-  }
+  const id = _salarieEditId || (Math.max(0, ...SALARIES_APP.map(s=>s.id||0)) + 1);
+  const sal = { id, nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur };
 
   closeModal('modal-salarie');
-
-  // Sync Railway puis recharger pour éviter les doublons
-  API.syncSalaries().then(() => {
-    API.loadAll().then(() => {
-      renderSalaries();
-      buildLoginScreen();
-      showToast(`✅ ${prenom||''} ${nom} sauvegardé`, 'var(--success)');
-    });
-  });
+  const token = localStorage.getItem('thermo_token');
+  fetch('/api/salaries/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(sal)
+  }).then(r => r.json()).then(() => {
+    return fetch('/api/salaries', { headers: { 'Authorization': 'Bearer ' + token } });
+  }).then(r => r.json()).then(data => {
+    SALARIES_APP.length = 0;
+    data.forEach(s => SALARIES_APP.push(s));
+    renderSalaries();
+    buildLoginScreen();
+    showToast('✅ ' + (prenom||'') + ' ' + nom + ' sauvegardé', 'var(--success)');
+  }).catch(() => showToast('❌ Erreur sauvegarde', 'var(--danger)'));
 }
 
 function toggleSalarie(id) {
   const s = SALARIES_APP.find(x => x.id === id);
   if (!s || s.role === 'admin') return;
   s.actif = !s.actif;
-  renderSalaries();
-  buildLoginScreen();
-  showToast(`${s.actif ? '▶ Réactivé' : '⏸ Désactivé'} : ${s.prenom||''} ${s.nom}`, s.actif ? 'var(--success)' : 'var(--warning)');
+  const token = localStorage.getItem('thermo_token');
+  fetch('/api/salaries/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(s)
+  }).then(() => {
+    renderSalaries();
+    buildLoginScreen();
+    const msg = (s.actif ? '▶ Réactivé' : '⏸ Désactivé') + ' : ' + (s.prenom||'') + ' ' + s.nom;
+    showToast(msg, s.actif ? 'var(--success)' : 'var(--warning)');
+  });
 }
 
 function supprimerSalarie(id) {
   const s = SALARIES_APP.find(x => x.id === id);
-  if (!s || s.role === 'admin') return;
-  const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
-  if (!confirm(`Supprimer définitivement ${nom} ? Cette action est irréversible.`)) return;
-  SALARIES_APP = SALARIES_APP.filter(x => x.id !== id);
+  if (!s || s.role === 'admin') { showToast('⚠️ Impossible de supprimer un admin', 'var(--danger)'); return; }
+  const nom = s.prenom ? s.prenom + ' ' + s.nom : s.nom;
+  if (!confirm('Supprimer définitivement ' + nom + ' ?')) return;
   closeModal('modal-salarie');
-  renderSalaries();
-  buildLoginScreen();
-  showToast(`🗑 ${nom} supprimé`, 'var(--danger)');
+  const token = localStorage.getItem('thermo_token');
+  fetch('/api/salaries/' + id, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(() => {
+    return fetch('/api/salaries', { headers: { 'Authorization': 'Bearer ' + token } });
+  }).then(r => r.json()).then(data => {
+    SALARIES_APP.length = 0;
+    data.forEach(s => SALARIES_APP.push(s));
+    renderSalaries();
+    buildLoginScreen();
+    showToast('🗑 ' + nom + ' supprimé', 'var(--danger)');
+  }).catch(() => showToast('❌ Erreur suppression', 'var(--danger)'));
 }
 
 
@@ -6634,35 +6646,17 @@ function renderDashboard() {
 function buildLoginScreen() {
   const list = document.getElementById('login-profiles-list');
   if (!list) return;
-
-  // Afficher d'abord ce qu'on a en local
-  _renderLoginProfiles();
-
-  // Puis enrichir depuis le serveur
+  list.innerHTML = '<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:10px">Chargement...</div>';
   fetch('/api/salaries-public')
-    .then(r => r.ok ? r.json() : null)
+    .then(r => r.ok ? r.json() : [])
     .then(data => {
-      if (!data || !data.length) return;
-      // Mettre à jour SALARIES_APP avec les données serveur
-      // (le serveur ne retourne pas les PINs, on garde les PINs locaux)
-      let changed = false;
-      data.forEach(s => {
-        const idx = SALARIES_APP.findIndex(x => x.id === s.id);
-        if (idx !== -1) {
-          const pinLocal = SALARIES_APP[idx].pin;
-          SALARIES_APP[idx] = { ...SALARIES_APP[idx], ...s, pin: pinLocal };
-        } else {
-          // Nouveau salarié pas encore en local
-          SALARIES_APP.push(s);
-          changed = true;
-        }
-      });
-      // Re-render uniquement si on a de nouveaux salariés
-      if (changed || data.length !== SALARIES_APP.filter(s=>s.actif).length) {
-        _renderLoginProfiles();
-      }
+      SALARIES_APP.length = 0;
+      data.forEach(s => SALARIES_APP.push(s));
+      _renderLoginProfiles();
     })
-    .catch(() => {}); // Silencieux si serveur inaccessible
+    .catch(() => {
+      list.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:10px">Serveur inaccessible</div>';
+    });
 }
 
 function _renderLoginProfiles() {
@@ -10317,48 +10311,36 @@ async function loginAdmin() {
   const errEl = document.getElementById('admin-login-error');
   if (!pin) return;
 
-  // 1. Vérifier le PIN via Railway
   const ok = await API.login(pin);
-
   if (!ok) {
-    // Hors ligne : essayer en local
-    const s = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
-    if (!s) {
-      errEl.style.display = 'block';
-      document.getElementById('admin-pin-input').value = '';
-      return;
-    }
-    errEl.style.display = 'none';
-    document.getElementById('admin-login-zone').style.display = 'none';
-    _connecterParPinOrig(pin);
+    errEl.style.display = 'block';
+    document.getElementById('admin-pin-input').value = '';
     return;
   }
 
   errEl.style.display = 'none';
   document.getElementById('admin-login-zone').style.display = 'none';
 
-  // 2. Charger TOUTES les données depuis Railway (y compris SALARIES_APP avec vrais PINs)
+  // Charger toutes les données
   await API.loadAll();
 
-  // Nettoyer les profils temporaires
-  SALARIES_APP.splice(0, SALARIES_APP.length, ...SALARIES_APP.filter(x => x.id > 0 && x.id < 999));
-
-  // 3. Connecter avec le profil admin — s'assurer qu'il a le PIN
-  let adminSal = SALARIES_APP.find(x => x.role === 'admin' && x.actif);
+  // Connecter avec le profil admin
+  const adminSal = SALARIES_APP.find(x => x.role === 'admin' && x.actif);
   if (adminSal) {
-    if (!adminSal.pin) adminSal.pin = pin; // Assigner le PIN si manquant
-    _connecterParPinOrig(pin);
+    if (!adminSal.pin) adminSal.pin = pin;
+    connecterParPin(pin);
   } else {
-    // Pas d'admin en base — connexion minimale
     currentRole = 'admin';
     currentProfilPin = pin;
-    const profil = { id:1, nom:'Admin', initiales:'AD', role:'admin',
-      roleLabel:'⚡ Admin', couleur:'var(--blue-mid)', pin, nav: NAV_PAR_ROLE.admin };
-    _connecterAvecProfil(profil, { id:1, nom:'Admin', role:'admin', pin, actif:true });
+    _connecterAvecProfil({
+      id:1, nom:'Admin', initiales:'AD', role:'admin',
+      roleLabel:'⚡ Admin', couleur:'var(--blue-mid)', pin,
+      nav: NAV_PAR_ROLE.admin
+    }, {id:1, nom:'Admin', role:'admin', pin, actif:true});
   }
-
-  showToast('☁️ Connecté en tant qu\'administrateur', 'var(--success)');
+  showToast('☁️ Connecté', 'var(--success)');
 }
+
 
 // ═══════════════════════════════════════════════════════
 // DONNÉES 100% RAILWAY — plus de localStorage

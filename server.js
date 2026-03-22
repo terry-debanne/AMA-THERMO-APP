@@ -250,13 +250,18 @@ app.get('/api/salaries', auth, (req, res) => {
 app.put('/api/salaries/:id', auth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin requis' });
   const id = parseInt(req.params.id);
-  const { nom, prenom, role, actif, data } = req.body;
+  const { nom, prenom, role, actif, pin } = req.body;
   const exists = db.prepare('SELECT id FROM salaries WHERE id = ?').get(id);
   if (exists) {
-    db.prepare('UPDATE salaries SET nom=?, prenom=?, role=?, actif=?, data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(nom, prenom||'', role||'operateur', actif?1:0, JSON.stringify(req.body), id);
+    if (pin) {
+      // Mettre à jour avec nouveau PIN
+      const pin_hash = bcrypt.hashSync(String(pin), 10);
+      db.prepare('UPDATE salaries SET nom=?, prenom=?, role=?, actif=?, pin_hash=?, data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(nom, prenom||'', role||'operateur', actif?1:0, pin_hash, JSON.stringify(req.body), id);
+    } else {
+      db.prepare('UPDATE salaries SET nom=?, prenom=?, role=?, actif=?, data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(nom, prenom||'', role||'operateur', actif?1:0, JSON.stringify(req.body), id);
+    }
   } else {
-    // Nouveau salarié — PIN par défaut = "1234", doit être changé
-    const pin_hash = bcrypt.hashSync('1234', 10);
+    const pin_hash = bcrypt.hashSync(String(pin||'1234'), 10);
     db.prepare('INSERT INTO salaries (id, nom, prenom, role, actif, pin_hash, data) VALUES (?,?,?,?,?,?,?)').run(id, nom, prenom||'', role||'operateur', actif?1:0, pin_hash, JSON.stringify(req.body));
   }
   res.json({ ok: true });

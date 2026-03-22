@@ -6646,12 +6646,20 @@ function renderDashboard() {
 function buildLoginScreen() {
   const list = document.getElementById('login-profiles-list');
   if (!list) return;
+  // Si déjà connecté avec des données, juste re-render
+  if (currentRole && SALARIES_APP.length > 0) {
+    _renderLoginProfiles();
+    return;
+  }
   list.innerHTML = '<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:10px">Chargement...</div>';
   fetch('/api/salaries-public')
     .then(r => r.ok ? r.json() : [])
     .then(data => {
-      SALARIES_APP.length = 0;
-      data.forEach(s => SALARIES_APP.push(s));
+      // Ne mettre à jour SALARIES_APP que si on n'a pas encore de données avec PINs
+      if (!SALARIES_APP.some(s => s.pin)) {
+        SALARIES_APP.length = 0;
+        data.forEach(s => SALARIES_APP.push(s));
+      }
       _renderLoginProfiles();
     })
     .catch(() => {
@@ -10454,7 +10462,7 @@ const API = (() => {
       if (Array.isArray(salaries) && salaries.length) {
         SALARIES_APP.length = 0;
         salaries.forEach(s => SALARIES_APP.push(s));
-        buildLoginScreen();
+        // Ne pas appeler buildLoginScreen ici — ça écraserait SALARIES_APP avec /api/salaries-public (sans PINs)
       }
 
       // Mettre à jour les compteurs

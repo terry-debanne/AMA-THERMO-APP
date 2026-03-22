@@ -10319,73 +10319,31 @@ async function loginAdmin() {
 }
 
 // ═══════════════════════════════════════════════════════
-// PERSISTANCE LOCALSTORAGE
+// DONNÉES 100% RAILWAY — plus de localStorage
 // ═══════════════════════════════════════════════════════
-const LS_KEY = 'thermoapp_v1';
 
-function sauvegarderDonnees() {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      OF_DATA, nextOFNum, DEVIS_DATA, nextDevisNum,
-      STOCK_DATA, nextLotId, CLIENTS_DATA, nextClientId,
-      SALARIES_APP, nextSalarieId, FOURNISSEURS, nextFournId,
-      HISTORIQUE_CONSO, HISTORIQUE_CONTROLE, SAISIES_TEMPS,
-      planningTaches, mesuresProduction,
-      savedAt: new Date().toISOString(),
-    }));
-    const el = document.getElementById('last-save-date');
-    if (el) el.textContent = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  } catch(e) { console.warn('Save failed:', e); }
-}
-
-function chargerDonnees() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (data.OF_DATA) Object.assign(OF_DATA, data.OF_DATA);
-    if (data.nextOFNum) nextOFNum = data.nextOFNum;
-    const restore = (t, s) => { if (Array.isArray(s)) { t.length=0; s.forEach(x=>t.push(x)); } };
-    restore(DEVIS_DATA, data.DEVIS_DATA);
-    restore(STOCK_DATA, data.STOCK_DATA);
-    restore(CLIENTS_DATA, data.CLIENTS_DATA);
-    restore(SALARIES_APP, data.SALARIES_APP);
-    restore(FOURNISSEURS, data.FOURNISSEURS);
-    restore(HISTORIQUE_CONSO, data.HISTORIQUE_CONSO);
-    restore(HISTORIQUE_CONTROLE, data.HISTORIQUE_CONTROLE);
-    restore(SAISIES_TEMPS, data.SAISIES_TEMPS);
-    restore(planningTaches, data.planningTaches);
-    restore(mesuresProduction, data.mesuresProduction);
-    if (data.nextDevisNum)  nextDevisNum  = data.nextDevisNum;
-    if (data.nextLotId)     nextLotId     = data.nextLotId;
-    if (data.nextClientId)  nextClientId  = data.nextClientId;
-    if (data.nextSalarieId) nextSalarieId = data.nextSalarieId;
-    if (data.nextFournId)   nextFournId   = data.nextFournId;
-    buildLoginScreen();
-  } catch(e) { console.warn('Load failed:', e); }
-}
-
+// Fonctions vides pour compatibilité (appelées dans le code mais sans effet)
+function sauvegarderDonnees() {}
+function chargerDonnees() { buildLoginScreen(); }
 function reinitialiserDonnees() {
-  if (!confirm('⚠️ Supprimer TOUTES les données ?')) return;
-  localStorage.removeItem(LS_KEY);
-  showToast('🗑 Données effacées — rechargez la page', 'var(--danger)');
-  setTimeout(() => location.reload(), 1500);
+  if (!confirm('⚠️ Supprimer TOUTES les données locales ?')) return;
+  localStorage.clear();
+  location.reload();
 }
 
 
 // ═══════════════════════════════════════════════════════
-// INIT AU CHARGEMENT
+// INIT AU CHARGEMENT — 100% Railway
 // ═══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Charger localStorage
-  chargerDonnees();
-  // 2. Rebrancher maintenance
+  // 1. Rebrancher maintenance
   document.querySelectorAll('[onclick*="modal-new-maintenance"]').forEach(btn => {
     btn.setAttribute('onclick', 'openMaintModal()');
   });
-  // 3. Afficher écran connexion + charger profils depuis serveur
+  // 2. Afficher écran connexion
   const loginScreen = document.getElementById('login-screen');
   if (loginScreen) loginScreen.style.display = 'flex';
+  // 3. Charger les profils depuis Railway pour la page de connexion
   buildLoginScreen();
   // 4. Modales
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -10396,11 +10354,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
-  // 5. Renders initiaux
+  // 5. Renders vides (données chargées après login via loadAll)
   renderOFTable();
   renderPlanning();
-  renderAnalyse();
-  renderRH();
   renderStock();
   renderDevis();
   updateMaintBadge();
@@ -10540,56 +10496,46 @@ window.connecterParPin = async function(pin) {
   }
 };
 
-// ── Sync salariés après modification ──────────────────────────────────────
+// ── Sync salariés après modification ─────────────────────────────────────
 const _sauvegarderSalarieOrig = sauvegarderSalarie;
 window.sauvegarderSalarie = function(...a) {
   _sauvegarderSalarieOrig(...a);
   if (API.isOnline()) API.syncSalaries();
 };
 
-// ── Patches render → Railway ──────────────────────────────────────────────
+// ── Patches Railway — sync après chaque action ───────────────────────────
 const _renderOFOrig = renderOFTable;
 window.renderOFTable = function() {
   _renderOFOrig();
-  Object.values(OF_DATA).forEach(of => API.save('/api/of/' + of.ref, of));
+  if (API.isOnline()) Object.values(OF_DATA).forEach(of => API.save('/api/of/' + of.ref, of));
 };
 const _renderStockOrig = renderStock;
-window.renderStock = function(...a) { _renderStockOrig(...a); API.save('/api/stock', STOCK_DATA); };
+window.renderStock = function(...a) {
+  _renderStockOrig(...a);
+  if (API.isOnline()) API.save('/api/stock', STOCK_DATA);
+};
 const _renderDevisOrig = renderDevis;
-window.renderDevis = function() { _renderDevisOrig(); DEVIS_DATA.forEach(d => API.save('/api/devis/' + d.ref, d)); };
+window.renderDevis = function() {
+  _renderDevisOrig();
+  if (API.isOnline()) DEVIS_DATA.forEach(d => API.save('/api/devis/' + d.ref, d));
+};
 const _renderPlanningOrig = renderPlanning;
-window.renderPlanning = function(...a) { _renderPlanningOrig(...a); API.save('/api/planning', planningTaches); };
+window.renderPlanning = function(...a) {
+  _renderPlanningOrig(...a);
+  if (API.isOnline()) API.save('/api/planning', planningTaches);
+};
+
+// ── Sync clients et fournisseurs ──────────────────────────────────────────
+const _renderClientsOrig = typeof renderClients === 'function' ? renderClients : null;
+if (_renderClientsOrig) {
+  window.renderClients = function(...a) {
+    _renderClientsOrig(...a);
+    if (API.isOnline()) API.save('/api/clients', CLIENTS_DATA);
+  };
+}
 
 
-// ═══════════════════════════════════════════════════════
-// AUTOSAVE LOCALSTORAGE
-// ═══════════════════════════════════════════════════════
-(function() {
-  function patchSave(name) {
-    const orig = window[name];
-    if (typeof orig !== 'function') return;
-    window[name] = function(...args) {
-      const r = orig.apply(this, args);
-      if (r&&typeof r.then==='function') r.then(()=>sauvegarderDonnees());
-      else sauvegarderDonnees();
-      return r;
-    };
-  }
-  const fns = ['creerOF','confirmerTerminaison','confirmerPlanifOF','retirerOFDuPlanning',
-    'sauvegarderLot','supprimerLot','creerCouleurStock','confirmerAjustement','supprimerStock',
-    'confirmerSaisiePoudre','sauvegarderDevis','convertirDevisEnOF',
-    'sauvegarderSalarie','supprimerSalarie','toggleSalarie',
-    'ajouterFournisseur','supprimerFournisseur','creerIntervention','cloturerIntervention',
-    'sauvegarderMesure','supprimerMesure','validerControle'];
-  document.addEventListener('DOMContentLoaded', () => {
-    fns.forEach(patchSave);
-    setInterval(()=>{try{sauvegarderDonnees();}catch(e){}}, 60000);
-    window.addEventListener('beforeunload',()=>{try{sauvegarderDonnees();}catch(e){}});
-    document.addEventListener('visibilitychange',()=>{
-      if(document.visibilityState==='hidden') try{sauvegarderDonnees();}catch(e){}
-    });
-  });
-})();
+// Autosave localStorage supprimé — données 100% Railway
 
 
 // ═══════════════════════════════════════════════════════

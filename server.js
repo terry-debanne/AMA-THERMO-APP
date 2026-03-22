@@ -451,28 +451,6 @@ app.delete('/api/salaries-app/reset', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Route reset urgence — à supprimer après usage
-// Accessible via GET /api/emergency-reset?key=THERMO2026
-app.get('/api/emergency-reset', (req, res) => {
-  if (req.query.key !== 'THERMO2026') return res.status(403).json({ error: 'Clé incorrecte' });
-  try {
-    // Vider toutes les tables auth
-    db.prepare('DELETE FROM salaries').run();
-    db.prepare('DELETE FROM app_data WHERE key = ?').run('SALARIES_APP');
-    // Recréer uniquement l'admin avec PIN 690769
-    const pin_hash = bcrypt.hashSync('690769', 10);
-    db.prepare('INSERT INTO salaries (id, nom, prenom, role, pin_hash, actif, data) VALUES (?,?,?,?,?,1,?)').run(
-      1, 'Admin', '', 'admin', pin_hash, JSON.stringify({
-        id:1, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
-        couleur:'var(--blue-mid)', pin:'690769', actif:true, competences:[], horaire:''
-      })
-    );
-    res.json({ ok: true, message: 'Admin recréé avec PIN 690769' });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.use((req, res) => res.status(404).json({ error: 'Route inconnue' }));

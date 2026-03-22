@@ -6318,7 +6318,7 @@ const NAV_PAR_ROLE = {
 // Construire PROFILS dynamiquement depuis SALARIES_APP
 function buildPROFILS() {
   const p = {};
-  SALARIES_APP.filter(s => s.actif).forEach(s => {
+  SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).forEach(s => {
     // Chercher la clé par PIN lors de la connexion
     p[s.pin] = {
       id:        s.id,
@@ -6403,7 +6403,7 @@ function renderSalaries() {
   // Tableau des droits
   const tbody = document.getElementById('droits-tbody');
   if (tbody) {
-    tbody.innerHTML = SALARIES_APP.filter(s => s.actif).map(s => {
+    tbody.innerHTML = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).map(s => {
       const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
       const isA = s.role === 'admin';
       const isR = s.role === 'resp_prod';
@@ -6487,21 +6487,28 @@ function sauvegarderSalarie() {
   const couleur = role === 'admin' ? 'var(--blue-mid)' : role === 'resp_prod' ? '#7c3aed' : '#0891b2';
 
   if (_salarieEditId) {
-    // Modifier
+    // Modifier localement
     const idx = SALARIES_APP.findIndex(s => s.id === _salarieEditId);
     if (idx !== -1) {
       SALARIES_APP[idx] = { ...SALARIES_APP[idx], nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur };
     }
-    showToast(`✅ ${prenom||''} ${nom} mis à jour`, 'var(--success)');
   } else {
-    // Créer
-    SALARIES_APP.push({ id: nextSalarieId++, nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur });
-    showToast(`✅ ${prenom||''} ${nom} ajouté`, 'var(--success)');
+    // Calculer le prochain id depuis SALARIES_APP existant
+    const maxId = SALARIES_APP.reduce((m, s) => Math.max(m, s.id||0), 0);
+    const newId = maxId + 1;
+    SALARIES_APP.push({ id: newId, nom, prenom, poste, role, pin, horaire, actif, competences: comps, initiales, couleur });
   }
 
   closeModal('modal-salarie');
-  renderSalaries();
-  buildLoginScreen();
+
+  // Sync Railway puis recharger pour éviter les doublons
+  API.syncSalaries().then(() => {
+    API.loadAll().then(() => {
+      renderSalaries();
+      buildLoginScreen();
+      showToast(`✅ ${prenom||''} ${nom} sauvegardé`, 'var(--success)');
+    });
+  });
 }
 
 function toggleSalarie(id) {
@@ -6563,7 +6570,7 @@ function renderDashboard() {
   if (kpiStockSub) kpiStockSub.textContent = alertsStock.length > 0 ? `⚠️ ${alertsStock.length} en stock faible` : `${STOCK_DATA.length} couleur${STOCK_DATA.length>1?'s':''}`;
 
   // KPI Équipe
-  const salActifs = SALARIES_APP.filter(s => s.actif);
+  const salActifs = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999);
   const kpiEquipe = document.getElementById('kpi-equipe');
   if (kpiEquipe) kpiEquipe.textContent = salActifs.length;
 
@@ -6664,7 +6671,7 @@ function _renderLoginProfiles() {
   const roleDesc = { admin: 'Accès complet', resp_prod: 'Production & Gestion', operateur: 'Saisie temps & consultation' };
   const roleBadge = { admin: '⚡ Admin', resp_prod: '🏭 Production', operateur: '🎨 Opérateur' };
   const roleBadgeClass = { admin: 'badge-admin', resp_prod: 'badge-prod', operateur: 'badge-op' };
-  list.innerHTML = SALARIES_APP.filter(s => s.actif).map(s => {
+  list.innerHTML = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).map(s => {
     const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
     return `<button class="profile-btn" data-pin="${s.pin}" onclick="demanderMotDePasse(this.dataset.pin)">
       <div class="profile-avatar" style="background:${s.couleur}">${s.initiales}</div>
@@ -10320,15 +10327,19 @@ async function loginAdmin() {
   // 2. Charger TOUTES les données depuis Railway (y compris SALARIES_APP avec vrais PINs)
   await API.loadAll();
 
+  // Nettoyer les profils temporaires (id:0)
+  const idxTmp = SALARIES_APP.findIndex(x => x.id === 0);
+  if (idxTmp !== -1) SALARIES_APP.splice(idxTmp, 1);
+
   // 3. Maintenant connecter localement avec le vrai profil chargé
   const adminSal = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
   if (adminSal) {
     _connecterParPinOrig(pin);
   } else {
     // Créer profil temporaire si SALARIES_APP ne contient pas encore cet admin
-    const tmp = { id:0, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
+    const tmp = { id:999, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
       couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:'' };
-    SALARIES_APP.unshift(tmp);
+    SALARIES_APP.push(tmp);
     _connecterParPinOrig(pin);
   }
 
@@ -10514,11 +10525,7 @@ window.connecterParPin = async function(pin) {
 };
 
 // ── Sync salariés après modification ─────────────────────────────────────
-const _sauvegarderSalarieOrig = sauvegarderSalarie;
-window.sauvegarderSalarie = function(...a) {
-  _sauvegarderSalarieOrig(...a);
-  if (API.isOnline()) API.syncSalaries();
-};
+// sauvegarderSalarie gère sa propre sync Railway
 
 // ── Patches Railway — sync après chaque action ───────────────────────────
 const _renderOFOrig = renderOFTable;

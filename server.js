@@ -37,61 +37,61 @@ db.exec(`
     pin_hash   TEXT NOT NULL,
     actif      INTEGER DEFAULT 1,
     data       TEXT,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS of_data (
     ref        TEXT PRIMARY KEY,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS devis (
     ref        TEXT PRIMARY KEY,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS stock (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS saisies (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     data       TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS planning (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS controles (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     data       TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS conso_poudre (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     data       TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS clients (
     id         INTEGER PRIMARY KEY,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS fournisseurs (
     id         INTEGER PRIMARY KEY,
     data       TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS connexions (
@@ -101,13 +101,13 @@ db.exec(`
     role         TEXT,
     ip           TEXT,
     user_agent   TEXT,
-    connected_at TEXT DEFAULT (datetime('now'))
+    connected_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 
   CREATE TABLE IF NOT EXISTS app_data (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP)
   );
 `);
 
@@ -177,7 +177,7 @@ app.get('/api/salaries-app', auth, (req, res) => {
 app.put('/api/salaries-app', auth, (req, res) => {
   try {
     const salaries = Array.isArray(req.body) ? req.body : [];
-    db.prepare('INSERT INTO app_data (key, value, updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at')
+    db.prepare('INSERT INTO app_data (key, value, updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at')
       .run('SALARIES_APP', JSON.stringify(salaries));
     res.json({ ok: true });
   } catch(e) {
@@ -230,7 +230,7 @@ app.put('/api/auth/pin/:id', auth, (req, res) => {
   if (!pin || String(pin).length < 4) return res.status(400).json({ error: 'PIN trop court (minimum 4 caractères)' });
   // Seul admin peut changer le PIN d'un autre
   if (req.user.role !== 'admin' && req.user.id !== targetId) return res.status(403).json({ error: 'Non autorisé' });
-  db.prepare('UPDATE salaries SET pin_hash = ?, updated_at = datetime('now') WHERE id = ?').run(bcrypt.hashSync(String(pin), 10), targetId);
+  db.prepare('UPDATE salaries SET pin_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(bcrypt.hashSync(String(pin), 10), targetId);
   res.json({ ok: true });
 });
 
@@ -253,7 +253,7 @@ app.put('/api/salaries/:id', auth, (req, res) => {
   const { nom, prenom, role, actif, data } = req.body;
   const exists = db.prepare('SELECT id FROM salaries WHERE id = ?').get(id);
   if (exists) {
-    db.prepare('UPDATE salaries SET nom=?, prenom=?, role=?, actif=?, data=?, updated_at=datetime('now') WHERE id=?').run(nom, prenom||'', role||'operateur', actif?1:0, JSON.stringify(req.body), id);
+    db.prepare('UPDATE salaries SET nom=?, prenom=?, role=?, actif=?, data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(nom, prenom||'', role||'operateur', actif?1:0, JSON.stringify(req.body), id);
   } else {
     // Nouveau salarié — PIN par défaut = "1234", doit être changé
     const pin_hash = bcrypt.hashSync('1234', 10);
@@ -280,7 +280,7 @@ app.get('/api/of', auth, (req, res) => {
 });
 
 app.put('/api/of/:ref', auth, (req, res) => {
-  db.prepare('INSERT INTO of_data (ref, data, updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(ref) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at').run(req.params.ref, JSON.stringify(req.body));
+  db.prepare('INSERT INTO of_data (ref, data, updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(ref) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at').run(req.params.ref, JSON.stringify(req.body));
   res.json({ ok: true });
 });
 
@@ -401,7 +401,7 @@ app.get('/api/app-data/:key', auth, (req, res) => {
 });
 
 app.put('/api/app-data/:key', auth, (req, res) => {
-  db.prepare('INSERT INTO app_data (key, value, updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at').run(req.params.key, JSON.stringify(req.body));
+  db.prepare('INSERT INTO app_data (key, value, updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at').run(req.params.key, JSON.stringify(req.body));
   res.json({ ok: true });
 });
 

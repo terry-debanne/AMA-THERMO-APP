@@ -10280,10 +10280,11 @@ async function loginAdmin() {
   const errEl = document.getElementById('admin-login-error');
   if (!pin) return;
 
-  // Vérifier via le serveur
+  // 1. Vérifier le PIN via Railway
   const ok = await API.login(pin);
+
   if (!ok) {
-    // Fallback local si hors ligne
+    // Hors ligne : essayer en local
     const s = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
     if (!s) {
       errEl.style.display = 'block';
@@ -10292,25 +10293,28 @@ async function loginAdmin() {
     }
     errEl.style.display = 'none';
     document.getElementById('admin-login-zone').style.display = 'none';
-    connecterParPin(pin);
+    _connecterParPinOrig(pin);
     return;
   }
 
   errEl.style.display = 'none';
   document.getElementById('admin-login-zone').style.display = 'none';
 
-  // Connexion locale avec profil admin
-  // Chercher ou créer un profil admin minimal
-  let adminSal = SALARIES_APP.find(x => x.role === 'admin');
-  if (!adminSal) {
-    adminSal = { id:999, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
-      couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:'' };
-    SALARIES_APP.push(adminSal);
-  }
-  connecterParPin(adminSal.pin || pin);
-
-  // Charger toutes les données depuis Railway
+  // 2. Charger TOUTES les données depuis Railway (y compris SALARIES_APP avec vrais PINs)
   await API.loadAll();
+
+  // 3. Maintenant connecter localement avec le vrai profil chargé
+  const adminSal = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
+  if (adminSal) {
+    _connecterParPinOrig(pin);
+  } else {
+    // Créer profil temporaire si SALARIES_APP ne contient pas encore cet admin
+    const tmp = { id:0, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
+      couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:'' };
+    SALARIES_APP.unshift(tmp);
+    _connecterParPinOrig(pin);
+  }
+
   showToast('☁️ Connecté en tant qu\'administrateur', 'var(--success)');
 }
 
@@ -10521,12 +10525,18 @@ const API = (() => {
 // ── Patch connexion : login local + Railway ───────────────────────────────
 const _connecterParPinOrig = connecterParPin;
 window.connecterParPin = async function(pin) {
-  _connecterParPinOrig(pin); // Connexion locale immédiate (affichage)
+  // 1. Login serveur d'abord
   const ok = await API.login(pin);
   if (ok) {
-    await API.syncSalaries(); // Sync salariés vers Railway
-    await API.loadAll();      // Charger toutes les données depuis Railway
+    // 2. Charger toutes les données (y compris SALARIES_APP avec vrais PINs)
+    await API.loadAll();
+    // 3. Connexion locale avec le vrai profil
+    const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
+    if (s) _connecterParPinOrig(pin);
     showToast('☁️ Synchronisé avec Railway', 'var(--success)');
+  } else {
+    // Hors ligne : connexion locale uniquement
+    _connecterParPinOrig(pin);
   }
 };
 

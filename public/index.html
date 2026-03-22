@@ -2123,7 +2123,7 @@ body {
               Les données sont sauvegardées automatiquement dans ce navigateur. Dernière sauvegarde : <span id="last-save-date">—</span>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-secondary btn-sm" onclick="sauvegarderDonnees();showToast('💾 Données sauvegardées manuellement','var(--success)')">💾 Sauvegarder maintenant</button>
+              <button class="btn btn-secondary btn-sm" onclick="API.syncSalaries();showToast('☁️ Données synchronisées','var(--success)')">☁️ Sync Railway</button>
               <button class="btn btn-sm" style="background:#fef2f2;color:var(--danger);border:1px solid #fca5a5" onclick="reinitialiserDonnees()">🗑 Effacer toutes les données</button>
             </div>
           </div>
@@ -9966,7 +9966,7 @@ function showToast(msg, color) {
   // Sauvegarde automatique après toute action réussie ou modifiante
   const saveColors = ['var(--success)', 'var(--warning)', 'var(--orange)', 'var(--danger)'];
   if (!color || saveColors.some(c => color.includes(c.replace('var(','').replace(')','')))) {
-    setTimeout(() => sauvegarderDonnees(), 200);
+    // Sync saisie temps vers Railway
   }
 }
 
@@ -10484,8 +10484,8 @@ const API = (() => {
   }
 
   async function save(path, body) {
-    if (!_online || !_token) { sauvegarderDonnees(); return; }
-    try { await request('PUT', path, body); } catch { sauvegarderDonnees(); }
+    if (!_online || !_token) return;
+    try { await request('PUT', path, body); } catch(e) { console.warn('Save failed:', path, e.message); }
   }
 
   async function post(path, body) {

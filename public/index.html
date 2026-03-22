@@ -6262,30 +6262,9 @@ function updateMaintBadge() {
 // ═══════════════════════════════════════════════
 
 // Base de données des salariés — seul l'admin peut modifier
-let SALARIES_APP = [
-  {
-    id: 1, nom: 'Gérant', prenom: '', initiales: 'GT',
-    poste: 'Gérant', role: 'admin', couleur: 'var(--blue-mid)',
-    pin: '690769', actif: true,
-    competences: ['Grenaillage','Peinture','Livraison','Gestion'],
-    horaire: 'Classique — 8h-12h / 13h30-17h30',
-  },
-  {
-    id: 2, nom: 'TASSEZ', prenom: 'Dylan', initiales: 'DT',
-    poste: 'Responsable Production', role: 'resp_prod', couleur: '#7c3aed',
-    pin: '2580', actif: true,
-    competences: ['Grenaillage','Peinture','Primaire','Planning'],
-    horaire: 'Classique — 8h-12h / 13h30-17h30',
-  },
-  {
-    id: 3, nom: 'BUTEZ', prenom: 'Mickaël', initiales: 'MB',
-    poste: 'Peintre', role: 'operateur', couleur: '#0891b2',
-    pin: '1111', actif: true,
-    competences: ['Peinture','Métallisation','Emballage'],
-    horaire: 'Classique — 8h-12h / 13h30-17h30',
-  },
-];
-let nextSalarieId = 4;
+// SALARIES_APP vide par défaut — tout est chargé depuis Railway
+let SALARIES_APP = [];
+let nextSalarieId = 1;
 
 // Navigation par rôle
 const NAV_PAR_ROLE = {
@@ -10296,19 +10275,43 @@ function enregistrerTemps(fromModal) {
 // ═══════════════════════════
 // ═══════════════════════════════════════════════════════════════════
 // Accès admin direct depuis le bouton discret
-function loginAdmin() {
+async function loginAdmin() {
   const pin = document.getElementById('admin-pin-input')?.value?.trim();
   const errEl = document.getElementById('admin-login-error');
   if (!pin) return;
-  const s = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
-  if (!s) {
-    errEl.style.display = 'block';
-    document.getElementById('admin-pin-input').value = '';
+
+  // Vérifier via le serveur
+  const ok = await API.login(pin);
+  if (!ok) {
+    // Fallback local si hors ligne
+    const s = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
+    if (!s) {
+      errEl.style.display = 'block';
+      document.getElementById('admin-pin-input').value = '';
+      return;
+    }
+    errEl.style.display = 'none';
+    document.getElementById('admin-login-zone').style.display = 'none';
+    connecterParPin(pin);
     return;
   }
+
   errEl.style.display = 'none';
   document.getElementById('admin-login-zone').style.display = 'none';
-  connecterParPin(pin);
+
+  // Connexion locale avec profil admin
+  // Chercher ou créer un profil admin minimal
+  let adminSal = SALARIES_APP.find(x => x.role === 'admin');
+  if (!adminSal) {
+    adminSal = { id:999, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
+      couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:'' };
+    SALARIES_APP.push(adminSal);
+  }
+  connecterParPin(adminSal.pin || pin);
+
+  // Charger toutes les données depuis Railway
+  await API.loadAll();
+  showToast('☁️ Connecté en tant qu\'administrateur', 'var(--success)');
 }
 
 // ═══════════════════════════════════════════════════════

@@ -114,16 +114,8 @@ db.exec(`
 // Créer les salariés par défaut si la table est vide
 const salCount = db.prepare('SELECT COUNT(*) as n FROM salaries').get().n;
 if (salCount === 0) {
-  const defaults = [
-    { id:1, nom:'Gérant',  prenom:'',       role:'admin',     pin:'1234' },
-    { id:2, nom:'TASSEZ',  prenom:'Dylan',   role:'resp_prod', pin:'2580' },
-    { id:3, nom:'BUTEZ',   prenom:'Mickaël', role:'operateur', pin:'1111' },
-  ];
-  const ins = db.prepare('INSERT INTO salaries (id, nom, prenom, role, pin_hash, actif, data) VALUES (?,?,?,?,?,1,?)');
-  for (const s of defaults) {
-    ins.run(s.id, s.nom, s.prenom, s.role, bcrypt.hashSync(s.pin, 10), JSON.stringify(s));
-  }
-  console.log('Salariés par défaut créés (PINs: 1234, 2580, 1111)');
+  // Pas de salariés par défaut — l'admin créera ses salariés depuis l'app
+  console.log('Base de données initialisée (aucun salarié par défaut)');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -450,6 +442,13 @@ app.get('/api/backup', auth, (req, res) => {
   };
   res.setHeader('Content-Disposition', `attachment; filename="thermo-backup-${new Date().toISOString().slice(0,10)}.json"`);
   res.json(backup);
+});
+
+// DELETE /api/salaries-app/reset — vider SALARIES_APP (admin seulement)
+app.delete('/api/salaries-app/reset', auth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin requis' });
+  db.prepare('DELETE FROM app_data WHERE key = ?').run('SALARIES_APP');
+  res.json({ ok: true });
 });
 
 // Health check

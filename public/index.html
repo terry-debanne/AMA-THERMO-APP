@@ -6728,11 +6728,24 @@ function validerMotDePasse() {
 }
 
 function connecterParPin(pin) {
-  const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
+  const s = SALARIES_APP.find(x => x.pin === pin && x.actif && x.id > 0 && x.id < 999);
   if (!s) { showToast('⚠️ Accès refusé', 'var(--danger)'); return; }
+  // Assigner le PIN au profil si manquant
+  if (!s.pin) s.pin = pin;
   const profils = buildPROFILS();
-  const profil = profils[pin];
-  if (!profil) return;
+  const profil = profils[pin] || Object.values(profils).find(p => p.id === s.id);
+  if (!profil) {
+    // Construire un profil minimal
+    const nom = s.prenom ? s.prenom + ' ' + s.nom : s.nom;
+    currentRole = s.role;
+    currentProfilPin = pin;
+    _connecterAvecProfil({
+      id: s.id, nom, initiales: s.initiales || nom.slice(0,2).toUpperCase(),
+      role: s.role, roleLabel: s.role === 'admin' ? '⚡ Admin' : s.role === 'resp_prod' ? '🏭 Resp. Production' : '🎨 Opérateur',
+      couleur: s.couleur || 'var(--blue-mid)', pin, nav: NAV_PAR_ROLE[s.role] || NAV_PAR_ROLE.operateur,
+    }, s);
+    return;
+  }
   currentRole = s.role;
   currentProfilPin = pin;
   _connecterAvecProfil(profil, s);
@@ -10327,20 +10340,21 @@ async function loginAdmin() {
   // 2. Charger TOUTES les données depuis Railway (y compris SALARIES_APP avec vrais PINs)
   await API.loadAll();
 
-  // Nettoyer les profils temporaires (id:0)
-  const idxTmp = SALARIES_APP.findIndex(x => x.id === 0);
-  if (idxTmp !== -1) SALARIES_APP.splice(idxTmp, 1);
+  // Nettoyer les profils temporaires
+  SALARIES_APP.splice(0, SALARIES_APP.length, ...SALARIES_APP.filter(x => x.id > 0 && x.id < 999));
 
-  // 3. Maintenant connecter localement avec le vrai profil chargé
-  const adminSal = SALARIES_APP.find(x => x.pin === pin && x.role === 'admin' && x.actif);
+  // 3. Connecter avec le profil admin — s'assurer qu'il a le PIN
+  let adminSal = SALARIES_APP.find(x => x.role === 'admin' && x.actif);
   if (adminSal) {
+    if (!adminSal.pin) adminSal.pin = pin; // Assigner le PIN si manquant
     _connecterParPinOrig(pin);
   } else {
-    // Créer profil temporaire si SALARIES_APP ne contient pas encore cet admin
-    const tmp = { id:999, nom:'Admin', prenom:'', initiales:'AD', role:'admin',
-      couleur:'var(--blue-mid)', pin, actif:true, competences:[], horaire:'' };
-    SALARIES_APP.push(tmp);
-    _connecterParPinOrig(pin);
+    // Pas d'admin en base — connexion minimale
+    currentRole = 'admin';
+    currentProfilPin = pin;
+    const profil = { id:1, nom:'Admin', initiales:'AD', role:'admin',
+      roleLabel:'⚡ Admin', couleur:'var(--blue-mid)', pin, nav: NAV_PAR_ROLE.admin };
+    _connecterAvecProfil(profil, { id:1, nom:'Admin', role:'admin', pin, actif:true });
   }
 
   showToast('☁️ Connecté en tant qu\'administrateur', 'var(--success)');

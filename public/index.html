@@ -6385,7 +6385,7 @@ function renderSalaries() {
         <div class="employe-role">${s.poste}</div>
         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${roleBadge}${actifBadge}</div>
         <div class="employe-skills" style="margin-top:8px">
-          ${s.competences.map(c => `<span class="skill-tag">${c}</span>`).join('')}
+          ${(s.competences||[]).map(c => `<span class="skill-tag">${c}</span>`).join('')}
         </div>
         <div style="margin-top:8px">
           <span class="horaire-chip">🕗 ${s.horaire}</span>

@@ -5205,7 +5205,7 @@ function recalculerPrix() {
       const m2 = (larg * haut) / 1000000;
       const portail = DATA_PORTAILS[idx];
       prixU = m2 * portail.prix_m2;
-      if (metalActif) metalM2 = m2 * MAJORATION_METALLISATION_M2;
+      if (metalActif) metalM2 = m2 * 2 * MAJORATION_METALLISATION_M2; // × 2 faces
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${m2.toFixed(3)} m² × ${portail.prix_m2} €/m²`;
     }

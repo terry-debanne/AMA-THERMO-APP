@@ -4897,7 +4897,8 @@ const RAL_COULEURS = [
   { code: "6019", nom: "Blanc verdâtre",  hex: "#bfde9b" },
 ];
 
-const MAJORATION_METALLISATION = 30; // € fixe par ligne (à ajuster)
+const MAJORATION_METALLISATION_M2 = 20; // € HT par m² pour la métallisation
+const MAJORATION_RENOVATION = 0.20;  // +20% sur le prix
 
 // État courant de la ligne en cours de création
 let ligneEnCours = {};
@@ -4933,10 +4934,17 @@ function buildFinitionSelect(id) {
   </select>`;
 }
 
+function buildRenovationCheck() {
+  return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
+    <input type="checkbox" id="chk-renovation" onchange="recalculerPrix()">
+    <span>🔧 <strong>Rénovation</strong> <span style="color:var(--gray-400);font-size:11px">+20% sur le prix</span></span>
+  </label>`;
+}
+
 function buildMetallisationCheck() {
   return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
     <input type="checkbox" id="chk-metallisation" onchange="recalculerPrix()">
-    <span>⚗️ <strong>Métallisation</strong> (primaire zinc) <span style="color:var(--gray-400);font-size:11px">+${MAJORATION_METALLISATION} € par ligne</span></span>
+    <span>⚗️ <strong>Métallisation</strong> (primaire zinc) <span style="color:var(--gray-400);font-size:11px">+20 €/m²</span></span>
   </label>`;
 }
 
@@ -5004,6 +5012,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.portailIdx = null;
 
@@ -5041,6 +5050,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.gcIdx = null;
 
@@ -5069,6 +5079,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
 
   } else if (type === 'divers_fixes') {
@@ -5094,6 +5105,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.dfIdx = null;
 
@@ -5121,6 +5133,7 @@ function ouvertureCalc(type) {
       <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
     </div>
     ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
     ${prixResultBlock()}`;
   }
 
@@ -5179,7 +5192,9 @@ function selectDiversFixe(idx) {
 function recalculerPrix() {
   const type = ligneEnCours.type;
   const qte = parseInt(document.getElementById('ligne-qte')?.value) || 1;
-  const metal = document.getElementById('chk-metallisation')?.checked ? MAJORATION_METALLISATION : 0;
+  const metalActif = document.getElementById('chk-metallisation')?.checked || false;
+  let metalM2 = 0; // sera calculé selon la surface
+  const renov = document.getElementById('chk-renovation')?.checked ? MAJORATION_RENOVATION : 0;
   let prixU = 0, detail = '', tempsMin = 0;
 
   if (type === 'portail') {
@@ -5190,6 +5205,7 @@ function recalculerPrix() {
       const m2 = (larg * haut) / 1000000;
       const portail = DATA_PORTAILS[idx];
       prixU = m2 * portail.prix_m2;
+      if (metalActif) metalM2 = m2 * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${m2.toFixed(3)} m² × ${portail.prix_m2} €/m²`;
     }
@@ -5203,6 +5219,8 @@ function recalculerPrix() {
       const gc = DATA_GARDE_CORPS[idx];
       const coefHauteur = haut / 1000; // 1000mm = référence, 1100mm = 1.1
       prixU = ml * gc.prix_ml * coefHauteur;
+      // Surface garde-corps estimée : longueur × hauteur × 2 faces
+      if (metalActif) metalM2 = ml * (haut/1000) * 2 * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       const coefStr = coefHauteur !== 1 ? ` × ${coefHauteur.toFixed(2)} (H=${haut}mm)` : '';
       detail = `${ml.toFixed(3)} ml × ${gc.prix_ml} €/ml${coefStr}`;
@@ -5215,6 +5233,8 @@ function recalculerPrix() {
       const profil = DATA_PROFILS[dimIdx];
       const ml = long / 1000;
       prixU = ml * profil.prix_ml;
+      // Surface profil estimée : périmètre section × longueur
+      if (metalActif) metalM2 = ml * (profil.perimetre_m2 || 0.1) * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${ml.toFixed(3)} ml × ${profil.prix_ml.toFixed(2)} €/ml`;
     }
@@ -5223,6 +5243,7 @@ function recalculerPrix() {
     const idx = ligneEnCours.dfIdx;
     if (idx !== null) {
       prixU = DATA_DIVERS_FIXES[idx].prix_u;
+      if (metalActif) metalM2 = (DATA_DIVERS_FIXES[idx].surface_m2 || 1) * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${prixU} €/u`;
     }
@@ -5233,7 +5254,8 @@ function recalculerPrix() {
     detail = `${prixU} € (saisie manuelle)`;
   }
 
-  const prixLigne = (prixU + metal) * qte;
+  const prixU_renov = prixU * (1 + renov);
+  const prixLigne = (prixU_renov + metalM2) * qte;
   const display = document.getElementById('calc-prix-display');
   const detailEl = document.getElementById('calc-detail');
   const tempsEl = document.getElementById('calc-temps-display');
@@ -5244,7 +5266,8 @@ function recalculerPrix() {
   }
   if (detailEl) {
     let detailStr = detail || '—';
-    if (metal > 0) detailStr += ` + ${metal}€ métal.`;
+    if (renov > 0) detailStr += ' +20% rénov.';
+    if (metalM2 > 0) detailStr += ` + ${metalM2.toFixed(2)}€ métal. (${(metalM2/MAJORATION_METALLISATION_M2).toFixed(2)}m²)`;
     if (qte > 1) detailStr += ` × qté ${qte}`;
     detailEl.textContent = detailStr;
   }
@@ -5255,7 +5278,8 @@ function recalculerPrix() {
     tempsEl.textContent = `⏱ Temps prévu : ${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'min' : ''}`;
   }
 
-  ligneEnCours.prixU = prixU;
+  ligneEnCours.prixU = prixU_renov;
+  ligneEnCours.renovation = renov > 0;
   ligneEnCours.prixTotal = prixLigne;
   ligneEnCours.detail = detail;
   ligneEnCours.qte = qte;

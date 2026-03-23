@@ -10462,7 +10462,7 @@ const API = (() => {
     if (!_online || !_token) return false;
     setIndicator('syncing');
     try {
-      const [ofs, devis, stock, saisies, planning, controles, consos, salaries] = await Promise.all([
+      const [ofs, devis, stock, saisies, planning, controles, consos, salaries, clients, fournisseurs] = await Promise.all([
         request('GET', '/api/of'),
         request('GET', '/api/devis'),
         request('GET', '/api/stock'),
@@ -10471,6 +10471,8 @@ const API = (() => {
         request('GET', '/api/controles'),
         request('GET', '/api/conso-poudre'),
         request('GET', '/api/salaries'),
+        request('GET', '/api/clients'),
+        request('GET', '/api/fournisseurs'),
       ]);
 
       // Mettre à jour toutes les données en mémoire
@@ -10485,6 +10487,8 @@ const API = (() => {
       restore(planningTaches, planning);
       restore(HISTORIQUE_CONTROLE, controles);
       restore(HISTORIQUE_CONSO, consos);
+      restore(CLIENTS_DATA, clients);
+      restore(FOURNISSEURS, fournisseurs);
       if (Array.isArray(salaries) && salaries.length) {
         SALARIES_APP.length = 0;
         salaries.forEach(s => SALARIES_APP.push(s));

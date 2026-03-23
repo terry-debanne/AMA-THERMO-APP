@@ -2677,6 +2677,11 @@ body {
       </div>
 
 
+      <div class="form-group" style="margin-top:8px">
+        <label class="form-label">Référence chantier <span style="color:var(--gray-400);font-size:11px">(optionnel)</span></label>
+        <input class="form-control" id="of-new-ref-chantier" placeholder="ex: Maison Dupont — Les Vans, Réf. client 2026-042...">
+      </div>
+
       <div style="margin-top:8px;border-top:2px solid var(--blue-pale);padding-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-family:'Barlow Condensed';font-weight:700;font-size:16px;color:var(--blue-dark)">Lignes de commande</div>
@@ -2925,6 +2930,11 @@ body {
           <label class="form-label">Motif de révision</label>
           <input class="form-control" id="devis-motif" placeholder="ex: correction de prix, ajout de ligne..." style="font-size:12px">
         </div>
+      </div>
+
+      <div class="form-group" style="margin-top:4px">
+        <label class="form-label">Référence chantier <span style="color:var(--gray-400);font-size:11px">(optionnel)</span></label>
+        <input class="form-control" id="devis-ref-chantier" placeholder="ex: Maison Dupont — Les Vans, Réf. client 2026-042...">
       </div>
 
       <!-- Lignes -->
@@ -5869,6 +5879,7 @@ function annulerNouvelOF() {
 function creerOF(mode) {
   const client       = document.getElementById('of-new-client')?.value;
   const delai        = document.getElementById('of-new-delai')?.value;
+  const refChantier  = document.getElementById('of-new-ref-chantier')?.value?.trim() || '';
   const surface      = parseFloat(document.getElementById('of-new-surface')?.value) || 0;
   const typeOuvrage  = document.getElementById('of-new-type-ouvrage')?.value || '';
   const errors = [];
@@ -5894,6 +5905,8 @@ function creerOF(mode) {
   // Effacer les erreurs si présentes
   const existing = document.getElementById('of-new-errors');
   if (existing) existing.remove();
+  const refChantierEl = document.getElementById('of-new-ref-chantier');
+  if (refChantierEl) refChantierEl.value = '';
 
   const annee = new Date().getFullYear().toString().slice(-2);
   const ref = `OF-${annee}-${String(nextOFNum).padStart(5,'0')}`;
@@ -5922,6 +5935,7 @@ function creerOF(mode) {
     ralHex, ralCode: 'RAL ' + ralCode, ralNom: premiereLigne?.ralNom || '—',
     finition: premiereLigne?.finition || '—',
     etat: 'Non lancé', etatBadge: 'badge-gray',
+    refChantier,
     surface, typeOuvrage,
     tempsTotal: 0,
     lignes: lignesOF.map((l, i) => ({
@@ -7427,6 +7441,9 @@ function imprimerOF(ref) {
   <div class="info-cell"><div class="info-label">Délai max</div><div class="info-val" style="color:${of.delaiUrgent?'#dc2626':'inherit'}">${of.delai}${of.delaiUrgent?' ⚠':''}</div></div>
   <div class="info-cell"><div class="info-label">Total HT</div><div class="info-val" style="color:#1d4ed8;font-size:16px">${totalStr} €</div></div>
 </div>
+${of.refChantier ? `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px"><span style="font-weight:700;color:#0369a1">📍 Référence chantier :</span> <span style="color:#0c4a6e">${of.refChantier}</span></div>` : ''}
+<div style="display:none">
+</div>
 
 <h3>Lignes de commande</h3>
 <table>
@@ -8118,6 +8135,7 @@ function ouvrirNouveauDevis() {
   document.getElementById('devis-modal-ref').textContent   = ref;
   document.getElementById('devis-revision-banner').style.display = 'none';
   document.getElementById('devis-client').value   = '';
+  if (document.getElementById('devis-ref-chantier')) document.getElementById('devis-ref-chantier').value = '';
   document.getElementById('devis-client').disabled = false;
   document.getElementById('devis-contact').value  = '';
   document.getElementById('devis-motif').value    = '';
@@ -8148,6 +8166,7 @@ function ouvrirEditionDevis(ref) {
   document.getElementById('devis-modal-ref').textContent   = `→ Créera ${newRef}`;
   document.getElementById('devis-revision-banner').style.display = 'block';
   document.getElementById('devis-client').value   = devis.client;
+  if (document.getElementById('devis-ref-chantier')) document.getElementById('devis-ref-chantier').value = devis.refChantier || '';
   document.getElementById('devis-client').disabled = true;
   document.getElementById('devis-contact').value  = devis.contact || '';
   document.getElementById('devis-motif').value    = '';
@@ -8246,9 +8265,10 @@ function renderLignesDevis() {
 }
 
 function sauvegarderDevis() {
-  const client   = document.getElementById('devis-client')?.value;
-  const contact  = document.getElementById('devis-contact')?.value?.trim();
-  const validite = document.getElementById('devis-validite')?.value;
+  const client      = document.getElementById('devis-client')?.value;
+  const contact     = document.getElementById('devis-contact')?.value?.trim();
+  const validite    = document.getElementById('devis-validite')?.value;
+  const refChantier = document.getElementById('devis-ref-chantier')?.value?.trim() || '';
   const motif    = document.getElementById('devis-motif')?.value?.trim();
   if (!client || client === '— Sélectionner —') { showToast('⚠️ Sélectionnez un client','var(--danger)'); return; }
   if (!validite) { showToast('⚠️ Indiquez une date de validité','var(--danger)'); return; }
@@ -8273,7 +8293,7 @@ function sauvegarderDevis() {
     // Mode création
     const ref = `DE-THERMO-${annee}-${String(nextDevisNum).padStart(5,'0')}`;
     nextDevisNum++;
-    DEVIS_DATA.unshift({ ref, version:1, client, contact, date:dateStr, validite:validiteStr, montant, etat:'Brouillon', ofRef:null, remplacePar:null, motif:'', lignes:[...lignesDevis] });
+    DEVIS_DATA.unshift({ ref, version:1, client, contact, date:dateStr, validite:validiteStr, montant, etat:'Brouillon', ofRef:null, remplacePar:null, motif:'', refChantier, lignes:[...lignesDevis] });
     closeModal('modal-new-devis');
     renderDevis();
     API.save('/api/devis/' + ref, DEVIS_DATA[0]);

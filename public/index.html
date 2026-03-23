@@ -4256,6 +4256,8 @@ const pageTitles = {
 };
 
 function showPage(id) {
+  // Sync immédiate depuis Railway au changement de page
+  if (API.isOnline()) API.loadAll().catch(()=>{});
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -6146,6 +6148,7 @@ function creerIntervention() {
 
   // Mettre à jour le badge menu
   updateMaintBadge();
+  API.save('/api/planning', planningTaches);
 
   closeModal('modal-new-maintenance');
 
@@ -6675,7 +6678,7 @@ function _renderLoginProfiles() {
   const roleBadgeClass = { admin: 'badge-admin', resp_prod: 'badge-prod', operateur: 'badge-op' };
   list.innerHTML = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).map(s => {
     const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
-    return `<button class="profile-btn" data-pin="${s.pin}" onclick="demanderMotDePasse(this.dataset.pin)">
+    return `<button class="profile-btn" data-salid="${s.id}" onclick="demanderMotDePasse(parseInt(this.dataset.salid))">
       <div class="profile-avatar" style="background:${s.couleur}">${s.initiales}</div>
       <div class="profile-info">
         <div class="profile-name">${nom}</div>
@@ -6686,12 +6689,12 @@ function _renderLoginProfiles() {
   }).join('');
 }
 
-let _loginPinEnAttente = null;
+let _loginSalId = null; // id du salarié en cours de login
 
-function demanderMotDePasse(pin) {
-  const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
+function demanderMotDePasse(salId) {
+  const s = SALARIES_APP.find(x => x.id === salId && x.actif);
   if (!s) return;
-  _loginPinEnAttente = pin;
+  _loginSalId = salId;
 
   const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
   const roleLabel = { admin:'⚡ Admin', resp_prod:'🏭 Resp. Production', operateur:'🎨 Opérateur' };
@@ -6709,14 +6712,14 @@ function demanderMotDePasse(pin) {
   setTimeout(() => document.getElementById('login-pwd-input')?.focus(), 200);
 }
 
-function validerMotDePasse() {
+async function validerMotDePasse() {
   const saisi = document.getElementById('login-pwd-input')?.value?.trim();
   const errEl  = document.getElementById('login-pwd-error');
-
   if (!saisi) { errEl.style.display = 'block'; return; }
 
-  const s = SALARIES_APP.find(x => x.pin === _loginPinEnAttente && x.actif);
-  if (!s || saisi !== s.pin) {
+  // Vérifier le PIN via Railway
+  const ok = await API.login(saisi);
+  if (!ok) {
     errEl.style.display = 'block';
     document.getElementById('login-pwd-input').value = '';
     document.getElementById('login-pwd-input').focus();
@@ -6725,8 +6728,15 @@ function validerMotDePasse() {
 
   errEl.style.display = 'none';
   closeModal('modal-login-pwd');
-  connecterParPin(_loginPinEnAttente);
-  _loginPinEnAttente = null;
+
+  // Charger les données et connecter
+  await API.loadAll();
+  const s = SALARIES_APP.find(x => x.id === _loginSalId && x.actif);
+  if (s) {
+    if (!s.pin) s.pin = saisi;
+    connecterParPin(saisi);
+  }
+  _loginSalId = null;
 }
 
 function connecterParPin(pin) {
@@ -8227,6 +8237,8 @@ function convertirDevisEnOF(devisRef) {
 
   renderDevis();
   renderOFTable();
+  API.save('/api/of/' + ref, OF_DATA[ref]);
+  DEVIS_DATA.forEach(d => API.save('/api/devis/' + d.ref, d));
   updateOFBadge();
 
   showToast(`✅ ${ref} créé depuis ${devisRef} — délai proposé : ${delaiStr}`, 'var(--success)');
@@ -9362,6 +9374,7 @@ function sauvegarderMesure(continuer) {
   renderRH();
   renderStock();
   renderDevis();
+  API.post('/api/saisies', mesuresProduction[mesuresProduction.length-1]);
   showToast(`✅ Mesure enregistrée — ${operation} sur ${type} (${tpu.toFixed(1)} min/${unite})`, 'var(--success)');
 
   if (continuer) {
@@ -9380,6 +9393,7 @@ function sauvegarderMesure(continuer) {
 
 function supprimerMesure(id) {
   mesuresProduction = mesuresProduction.filter(m => m.id !== id);
+  API.save('/api/planning', planningTaches);
   renderAnalyse();
   renderRH();
   renderStock();
@@ -9942,6 +9956,7 @@ function confirmerPlanifOF() {
   salariesCoches.forEach(sal => ordonnannerSalarie(sal, dateDebutVal));
 
   renderPlanning();
+  API.save('/api/planning', planningTaches);
   closeModal('modal-planif-of');
 
   const tempsTotal = of.lignes.reduce((s, l) => s + (l.temps || 0), 0);
@@ -9969,7 +9984,7 @@ function retirerOFDuPlanning(ref) {
     const dateDebut = OF_DATA[ref]?.dateDebutPlanif || dateToKey(new Date());
     ordonnannerSalarie(s, dateDebut);
   });
-  if (planningTaches.length !== avant) renderPlanning();
+  if (planningTaches.length !== avant) { renderPlanning(); API.save('/api/planning', planningTaches); }
 }
 
 function showToast(msg, color) {
@@ -10304,7 +10319,11 @@ function enregistrerTemps(fromModal) {
   updateSaveBtn();
 
   // Toast
-  const msg = document.createElement('div');
+  // Sync Railway
+  if (API.isOnline()) SAISIES_TEMPS.slice(-chronoOFSelectionnes.size).forEach(s => API.post('/api/saisies', s));
+  renderOFTable();
+
+    const msg = document.createElement('div');
   msg.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--success);color:white;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:fadeInUp 0.2s ease';
   msg.textContent = `✅ ${dureeLabel} enregistrés — ${ofLabel}`;
   document.body.appendChild(msg);
@@ -10498,10 +10517,10 @@ const API = (() => {
     try { await request('PUT', '/api/salaries-app', SALARIES_APP); } catch(e) {}
   }
 
-  // Sync auto 30s
+  // Sync auto 5s
   setInterval(async () => {
     if (_online && _token) try { await loadAll(); } catch(e) {}
-  }, 30000);
+  }, 5000);
 
   return { login, save, post, loadAll, isOnline: () => _online, setIndicator, syncSalaries };
 })();

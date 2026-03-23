@@ -4907,8 +4907,19 @@ let lignesOF = [];
 // SÉLECTEUR RAL COMMUN
 // ═══════════════════════════
 function buildRALSelect(id) {
+  // Utiliser uniquement les couleurs du stock poudre
+  const couleurs = STOCK_DATA.length > 0
+    ? STOCK_DATA.map(s => ({ code: s.ral, nom: s.nom||'', hex: s.hex||'#888888', fin: s.finition||'' }))
+    : RAL_COULEURS.map(r => ({ code: r.code, nom: r.nom, hex: r.hex, fin: '' }));
+
+  if (!couleurs.length) {
+    return `<select class="form-control" id="${id}" onchange="recalculerPrix()">
+      <option value="">— Aucune couleur en stock —</option>
+    </select>`;
+  }
+
   return `<select class="form-control" id="${id}" onchange="recalculerPrix()">
-    ${RAL_COULEURS.map(r => `<option value="${r.code}" data-hex="${r.hex}">RAL ${r.code} — ${r.nom}</option>`).join('')}
+    ${couleurs.map(r => `<option value="${r.code}" data-hex="${r.hex}">RAL ${r.code}${r.nom?' — '+r.nom:''}${r.fin?' ('+r.fin+')':''}</option>`).join('')}
   </select>`;
 }
 

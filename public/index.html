@@ -6675,7 +6675,7 @@ function _renderLoginProfiles() {
   const roleBadgeClass = { admin: 'badge-admin', resp_prod: 'badge-prod', operateur: 'badge-op' };
   list.innerHTML = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).map(s => {
     const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
-    return `<button class="profile-btn" data-salid="${s.id}" onclick="demanderMotDePasse(parseInt(this.dataset.salid))">
+    return `<button class="profile-btn" data-pin="${s.pin}" onclick="demanderMotDePasse(this.dataset.pin)">
       <div class="profile-avatar" style="background:${s.couleur}">${s.initiales}</div>
       <div class="profile-info">
         <div class="profile-name">${nom}</div>
@@ -6686,12 +6686,12 @@ function _renderLoginProfiles() {
   }).join('');
 }
 
-let _loginSalId = null; // id du salarié en cours de login
+let _loginPinEnAttente = null;
 
-function demanderMotDePasse(salId) {
-  const s = SALARIES_APP.find(x => x.id === salId && x.actif);
+function demanderMotDePasse(pin) {
+  const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
   if (!s) return;
-  _loginSalId = salId;
+  _loginPinEnAttente = pin;
 
   const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
   const roleLabel = { admin:'⚡ Admin', resp_prod:'🏭 Resp. Production', operateur:'🎨 Opérateur' };
@@ -6709,14 +6709,14 @@ function demanderMotDePasse(salId) {
   setTimeout(() => document.getElementById('login-pwd-input')?.focus(), 200);
 }
 
-async function validerMotDePasse() {
+function validerMotDePasse() {
   const saisi = document.getElementById('login-pwd-input')?.value?.trim();
   const errEl  = document.getElementById('login-pwd-error');
+
   if (!saisi) { errEl.style.display = 'block'; return; }
 
-  // Vérifier le PIN via Railway
-  const ok = await API.login(saisi);
-  if (!ok) {
+  const s = SALARIES_APP.find(x => x.pin === _loginPinEnAttente && x.actif);
+  if (!s || saisi !== s.pin) {
     errEl.style.display = 'block';
     document.getElementById('login-pwd-input').value = '';
     document.getElementById('login-pwd-input').focus();
@@ -6725,15 +6725,8 @@ async function validerMotDePasse() {
 
   errEl.style.display = 'none';
   closeModal('modal-login-pwd');
-
-  // Charger les données et connecter
-  await API.loadAll();
-  const s = SALARIES_APP.find(x => x.id === _loginSalId && x.actif);
-  if (s) {
-    if (!s.pin) s.pin = saisi;
-    connecterParPin(saisi);
-  }
-  _loginSalId = null;
+  connecterParPin(_loginPinEnAttente);
+  _loginPinEnAttente = null;
 }
 
 function connecterParPin(pin) {

@@ -5186,12 +5186,15 @@ function recalculerPrix() {
   } else if (type === 'garde_corps') {
     const idx = ligneEnCours.gcIdx;
     const long = parseFloat(document.getElementById('gc-long')?.value) || 0;
+    const haut = parseFloat(document.getElementById('gc-haut')?.value) || 1000;
     if (idx !== null && long > 0) {
       const ml = long / 1000;
       const gc = DATA_GARDE_CORPS[idx];
-      prixU = ml * gc.prix_ml;
+      const coefHauteur = haut / 1000; // 1000mm = référence, 1100mm = 1.1
+      prixU = ml * gc.prix_ml * coefHauteur;
       tempsMin = prixU * 60 / TAUX_H;
-      detail = `${ml.toFixed(3)} ml × ${gc.prix_ml} €/ml`;
+      const coefStr = coefHauteur !== 1 ? ` × ${coefHauteur.toFixed(2)} (H=${haut}mm)` : '';
+      detail = `${ml.toFixed(3)} ml × ${gc.prix_ml} €/ml${coefStr}`;
     }
 
   } else if (type === 'profils') {

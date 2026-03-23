@@ -5402,6 +5402,7 @@ function ajouterLigneOF() {
     desig = document.getElementById('ligne-desig')?.value || ligneEnCours.type;
   }
   if (ligneEnCours.metal) desig += ' + métallisation';
+  if (ligneEnCours.renovation) desig += ' (rénovation)';
 
   closeModal('modal-calc-ouvrage');
 
@@ -5441,6 +5442,7 @@ function ajouterLigneOF() {
       ralHex,
       fin:         finition,
       metal:       ligneEnCours.metal || false,
+      renovation:  ligneEnCours.renovation || false,
       pu:          ligneEnCours.prixU,
       total:       ligneEnCours.prixTotal,
       temps:       ligneEnCours.temps,
@@ -5454,6 +5456,7 @@ function ajouterLigneOF() {
       ralCode, ralHex, ralNom, finition,
       prixU: ligneEnCours.prixU, prixTotal: ligneEnCours.prixTotal,
       detail: ligneEnCours.detail, temps: ligneEnCours.temps, metal: ligneEnCours.metal,
+      renovation: ligneEnCours.renovation || false,
     };
     lignesOF.push(ligne);
     renderLignesOF();

@@ -7882,15 +7882,17 @@ function sauvegarderClient() {
   }
   closeModal('modal-new-client');
   // Sauvegarder sur Railway et recharger
+  API._saving = true;
   fetch('/api/clients', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
     body: JSON.stringify(CLIENTS_DATA)
   }).then(r => r.json()).then(() => {
+    API._saving = false;
     renderClients();
     updateClientSelects();
     showToast('✅ ' + societe + ' sauvegardé', 'var(--success)');
-  }).catch(() => showToast('❌ Erreur sauvegarde client', 'var(--danger)'));
+  }).catch(() => { API._saving = false; showToast('❌ Erreur sauvegarde client', 'var(--danger)'); });
 }
 
 function supprimerClient(id) {
@@ -10602,8 +10604,11 @@ const API = (() => {
     } catch { _online = false; setIndicator('offline'); return false; }
   }
 
+  let _saving = false; // bloque loadAll pendant une sauvegarde en cours
+
   async function loadAll() {
     if (!_online || !_token) return false;
+    if (_saving) return false; // Ne pas recharger pendant une sauvegarde
     setIndicator('syncing');
     try {
       const [ofs, devis, stock, saisies, planning, controles, consos, salaries, clients, fournisseurs] = await Promise.all([
@@ -10624,15 +10629,27 @@ const API = (() => {
         Object.keys(OF_DATA).forEach(k => delete OF_DATA[k]);
         Object.assign(OF_DATA, ofs);
       }
-      const restore = (t, s) => { if (Array.isArray(s) && s.length) { t.length=0; s.forEach(x=>t.push(x)); } };
+      // Ne jamais écraser des données locales avec un tableau vide de Railway
+      const restore = (t, s, apiPath) => {
+        if (Array.isArray(s) && s.length) {
+          t.length=0; s.forEach(x=>t.push(x));
+        } else if (apiPath && t.length > 0 && Array.isArray(s) && s.length === 0) {
+          // Railway est vide mais on a des données locales — les sauvegarder sur Railway
+          fetch(apiPath, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _token },
+            body: JSON.stringify(t)
+          });
+        }
+      };
       restore(DEVIS_DATA, devis);
       restore(STOCK_DATA, stock);
       restore(SAISIES_TEMPS, saisies);
       restore(planningTaches, planning);
       restore(HISTORIQUE_CONTROLE, controles);
       restore(HISTORIQUE_CONSO, consos);
-      restore(CLIENTS_DATA, clients);
-      restore(FOURNISSEURS, fournisseurs);
+      restore(CLIENTS_DATA, clients, '/api/clients');
+      restore(FOURNISSEURS, fournisseurs, '/api/fournisseurs');
       if (Array.isArray(salaries) && salaries.length) {
         SALARIES_APP.length = 0;
         salaries.forEach(s => SALARIES_APP.push(s));
@@ -10677,7 +10694,7 @@ const API = (() => {
     if (_online && _token) try { await loadAll(); } catch(e) {}
   }, 5000);
 
-  return { login, save, post, loadAll, isOnline: () => _online, setIndicator, syncSalaries };
+  return { login, save, post, loadAll, isOnline: () => _online, setIndicator, syncSalaries, get _saving() { return _saving; }, set _saving(v) { _saving = v; } };
 })();
 
 // ── Patch connexion : login local + Railway ───────────────────────────────

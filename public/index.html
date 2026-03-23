@@ -5283,7 +5283,7 @@ function recalculerPrix() {
   ligneEnCours.prixTotal = prixLigne;
   ligneEnCours.detail = detail;
   ligneEnCours.qte = qte;
-  ligneEnCours.metal = metal > 0;
+  ligneEnCours.metal = metalActif;
   ligneEnCours.temps = tempsMin * qte;
 }
 
@@ -7772,14 +7772,20 @@ function sauvegarderClient() {
   if (_clientEditId) {
     const idx = CLIENTS_DATA.findIndex(c => c.id === _clientEditId);
     if (idx !== -1) CLIENTS_DATA[idx] = { ...CLIENTS_DATA[idx], societe, nom, prenom, tel, email };
-    showToast(`✅ ${societe} mis à jour`, 'var(--success)');
   } else {
     CLIENTS_DATA.push({ id: nextClientId++, societe, nom, prenom, tel, email });
-    showToast(`✅ ${societe} ajouté`, 'var(--success)');
   }
   closeModal('modal-new-client');
-  renderClients();
-  API.save('/api/clients', CLIENTS_DATA);
+  // Sauvegarder sur Railway et recharger
+  fetch('/api/clients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(CLIENTS_DATA)
+  }).then(r => r.json()).then(() => {
+    renderClients();
+    updateClientSelects();
+    showToast('✅ ' + societe + ' sauvegardé', 'var(--success)');
+  }).catch(() => showToast('❌ Erreur sauvegarde client', 'var(--danger)'));
 }
 
 function supprimerClient(id) {
@@ -7787,9 +7793,11 @@ function supprimerClient(id) {
   if (!c) return;
   if (!confirm(`Supprimer "${c.societe}" ?`)) return;
   CLIENTS_DATA.splice(CLIENTS_DATA.findIndex(x=>x.id===id), 1);
-  renderClients();
-  API.save('/api/clients', CLIENTS_DATA);
-  showToast(`🗑 ${c.societe} supprimé`, 'var(--danger)');
+  fetch('/api/clients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(CLIENTS_DATA)
+  }).then(() => { renderClients(); showToast('🗑 ' + c.societe + ' supprimé', 'var(--danger)'); });
 }
 
 // ═══════════════════════════════════════════════
@@ -7841,9 +7849,11 @@ function ajouterFournisseur() {
   errEl.style.display = 'none';
   FOURNISSEURS.push({ id: nextFournId++, nom });
   input.value = '';
-  renderFournisseurs();
-  API.save('/api/fournisseurs', FOURNISSEURS);
-  showToast(`✅ ${nom} ajouté`, 'var(--success)');
+  fetch('/api/fournisseurs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(FOURNISSEURS)
+  }).then(() => { renderFournisseurs(); showToast('✅ ' + nom + ' ajouté', 'var(--success)'); });
 }
 
 function supprimerFournisseur(id) {
@@ -7851,9 +7861,11 @@ function supprimerFournisseur(id) {
   if (!f) return;
   if (!confirm(`Supprimer "${f.nom}" ?`)) return;
   FOURNISSEURS = FOURNISSEURS.filter(x => x.id !== id);
-  renderFournisseurs();
-  API.save('/api/fournisseurs', FOURNISSEURS);
-  showToast(`🗑 ${f.nom} supprimé`, 'var(--danger)');
+  fetch('/api/fournisseurs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(FOURNISSEURS)
+  }).then(() => { renderFournisseurs(); showToast('🗑 ' + f.nom + ' supprimé', 'var(--danger)'); });
 }
 
 function ouvrirGestionFournisseurs() {

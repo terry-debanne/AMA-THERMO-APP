@@ -1657,14 +1657,7 @@ body {
             <table class="data-table">
               <thead><tr><th>Référence</th><th>Client</th><th>Clôture</th><th>Montant HT</th><th>État</th><th>Actions</th></tr></thead>
               <tbody id="of-termines-tbody">
-                <tr>
-                  <td class="of-number">OF-26-00004</td>
-                  <td>SAS Bâtiferro</td>
-                  <td>15/03/2026</td>
-                  <td>2 150,00 €</td>
-                  <td><span class="badge badge-green">✅ Terminé</span></td>
-                  <td><button class="btn btn-ghost btn-sm btn-icon">📄</button></td>
-                </tr>
+                <!-- généré par renderOFTermines() -->
               </tbody>
             </table>
           </div>
@@ -1981,6 +1974,7 @@ body {
         <button class="tab-btn" onclick="switchTab('reg-tabs','reg-operations',this)">Opérations</button>
         <button class="tab-btn" onclick="switchTab('reg-tabs','reg-horaires',this)">Horaires</button>
         <button class="tab-btn" onclick="switchTab('reg-tabs','reg-numerotation',this)">Numérotation</button>
+        <button class="tab-btn" onclick="switchTab('reg-tabs','reg-typologies',this)">Typologies clients</button>
       </div>
 
       <div id="reg-tabs">
@@ -2084,6 +2078,18 @@ body {
                   <button class="btn btn-ghost btn-sm">Modifier</button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="reg-typologies">
+          <div class="card" style="max-width:600px">
+            <div class="card-header">
+              <div class="card-title">Typologies clients</div>
+              <button class="btn btn-primary btn-sm" onclick="ajouterTypologie()">+ Ajouter</button>
+            </div>
+            <div class="card-body" id="typologies-liste">
+              <!-- généré par renderTypologies() -->
             </div>
           </div>
         </div>
@@ -2976,6 +2982,12 @@ body {
           <label class="form-label">Email</label>
           <input class="form-control" id="client-email" type="email">
         </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Typologie client</label>
+        <select class="form-control" id="client-typologie">
+          <!-- peuplé par peuplerSelectTypologie() -->
+        </select>
       </div>
       <div id="client-error" style="display:none;color:var(--danger);font-size:12px;font-weight:600;margin-top:4px"></div>
     </div>
@@ -4236,6 +4248,49 @@ body {
 </div>
 
 
+<!-- ═══ MODAL RAPIDE RAL ═══ -->
+<div class="modal-overlay" id="modal-rapide-ral">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">🎨 Nouveau RAL</div>
+      <button class="modal-close" onclick="closeModal('modal-rapide-ral')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Code RAL *</label>
+        <input class="form-control" id="rapide-ral-code" placeholder="ex: 9010" maxlength="6" oninput="previewRapideRAL()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom de la couleur</label>
+        <input class="form-control" id="rapide-ral-nom" placeholder="ex: Blanc pur">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Finition</label>
+        <select class="form-control" id="rapide-ral-fin">
+          <option value="Mat 30%">Mat 30%</option>
+          <option value="Mat 70%">Mat 70%</option>
+          <option value="Satiné">Satiné</option>
+          <option value="Brillant">Brillant</option>
+          <option value="Texturé">Texturé</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Couleur approximative</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="rapide-ral-hex" value="#ffffff" class="form-control" style="width:60px;height:38px;padding:2px;cursor:pointer">
+          <div id="rapide-ral-preview" style="flex:1;height:38px;border-radius:6px;background:#ffffff;border:1px solid var(--gray-200)"></div>
+        </div>
+      </div>
+      <div id="rapide-ral-error" style="display:none;color:var(--danger);font-size:12px;font-weight:600"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-rapide-ral')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerRapideRAL()">➕ Ajouter au stock</button>
+    </div>
+  </div>
+</div>
+
+
 <script>
 // ═══════════════════════════
 // NAVIGATION
@@ -4256,6 +4311,8 @@ const pageTitles = {
 };
 
 function showPage(id) {
+  // Sync immédiate depuis Railway au changement de page
+  if (API.isOnline()) API.loadAll().catch(()=>{});
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -4359,7 +4416,7 @@ function openOFDetail(ref) {
     const th = Math.floor(l.temps/60), tm = l.temps%60;
     return `<tr>
       <td style="color:var(--gray-400)">${l.num}</td>
-      <td>${l.designation}</td>
+      <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
       <td style="text-align:center">${l.qte}</td>
       <td><div style="display:flex;align-items:center;gap:5px">
         <div style="width:12px;height:12px;border-radius:50%;background:${l.ralHex||of.ralHex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></div>
@@ -4902,7 +4959,8 @@ const RAL_COULEURS = [
   { code: "6019", nom: "Blanc verdâtre",  hex: "#bfde9b" },
 ];
 
-const MAJORATION_METALLISATION = 30; // € fixe par ligne (à ajuster)
+const MAJORATION_METALLISATION_M2 = 20; // € HT par m² pour la métallisation
+const MAJORATION_RENOVATION = 0.20;  // +20% sur le prix
 
 // État courant de la ligne en cours de création
 let ligneEnCours = {};
@@ -4912,9 +4970,22 @@ let lignesOF = [];
 // SÉLECTEUR RAL COMMUN
 // ═══════════════════════════
 function buildRALSelect(id) {
-  return `<select class="form-control" id="${id}" onchange="recalculerPrix()">
-    ${RAL_COULEURS.map(r => `<option value="${r.code}" data-hex="${r.hex}">RAL ${r.code} — ${r.nom}</option>`).join('')}
-  </select>`;
+  const couleurs = STOCK_DATA.length > 0
+    ? STOCK_DATA.map(s => ({ code: s.ral, nom: s.nom||'', hex: s.hex||'#888888', fin: s.finition||'' }))
+    : RAL_COULEURS.map(r => ({ code: r.code, nom: r.nom, hex: r.hex, fin: '' }));
+
+  const selectHtml = couleurs.length
+    ? `<select class="form-control" id="${id}" onchange="recalculerPrix()" style="flex:1">
+        ${couleurs.map(r => `<option value="${r.code}" data-hex="${r.hex}">RAL ${r.code}${r.nom?' — '+r.nom:''}${r.fin?' ('+r.fin+')':''}</option>`).join('')}
+      </select>`
+    : `<select class="form-control" id="${id}" onchange="recalculerPrix()" style="flex:1">
+        <option value="">— Aucune couleur en stock —</option>
+      </select>`;
+
+  return `<div style="display:flex;gap:6px;align-items:center">
+    ${selectHtml}
+    <button type="button" onclick="ouvrirModalRapideRAL('${id}')" class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0" title="Créer une nouvelle couleur RAL">＋ RAL</button>
+  </div>`;
 }
 
 function buildFinitionSelect(id) {
@@ -4927,10 +4998,17 @@ function buildFinitionSelect(id) {
   </select>`;
 }
 
+function buildRenovationCheck() {
+  return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
+    <input type="checkbox" id="chk-renovation" onchange="recalculerPrix()">
+    <span>🔧 <strong>Rénovation</strong> <span style="color:var(--gray-400);font-size:11px">+20% sur le prix</span></span>
+  </label>`;
+}
+
 function buildMetallisationCheck() {
   return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
     <input type="checkbox" id="chk-metallisation" onchange="recalculerPrix()">
-    <span>⚗️ <strong>Métallisation</strong> (primaire zinc) <span style="color:var(--gray-400);font-size:11px">+${MAJORATION_METALLISATION} € par ligne</span></span>
+    <span>⚗️ <strong>Métallisation</strong> (primaire zinc) <span style="color:var(--gray-400);font-size:11px">+20 €/m²</span></span>
   </label>`;
 }
 
@@ -4998,6 +5076,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.portailIdx = null;
 
@@ -5035,6 +5114,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.gcIdx = null;
 
@@ -5063,6 +5143,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
 
   } else if (type === 'divers_fixes') {
@@ -5088,6 +5169,7 @@ function ouvertureCalc(type) {
         <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
       </div>
       ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
       ${prixResultBlock()}`;
     ligneEnCours.dfIdx = null;
 
@@ -5115,6 +5197,7 @@ function ouvertureCalc(type) {
       <div class="form-group"><label class="form-label">Finition</label>${buildFinitionSelect('ligne-finition')}</div>
     </div>
     ${buildMetallisationCheck()}
+      ${buildRenovationCheck()}
     ${prixResultBlock()}`;
   }
 
@@ -5173,7 +5256,9 @@ function selectDiversFixe(idx) {
 function recalculerPrix() {
   const type = ligneEnCours.type;
   const qte = parseInt(document.getElementById('ligne-qte')?.value) || 1;
-  const metal = document.getElementById('chk-metallisation')?.checked ? MAJORATION_METALLISATION : 0;
+  const metalActif = document.getElementById('chk-metallisation')?.checked || false;
+  let metalM2 = 0; // sera calculé selon la surface
+  const renov = document.getElementById('chk-renovation')?.checked ? MAJORATION_RENOVATION : 0;
   let prixU = 0, detail = '', tempsMin = 0;
 
   if (type === 'portail') {
@@ -5184,6 +5269,7 @@ function recalculerPrix() {
       const m2 = (larg * haut) / 1000000;
       const portail = DATA_PORTAILS[idx];
       prixU = m2 * portail.prix_m2;
+      if (metalActif) metalM2 = m2 * 2 * MAJORATION_METALLISATION_M2; // × 2 faces
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${m2.toFixed(3)} m² × ${portail.prix_m2} €/m²`;
     }
@@ -5191,12 +5277,17 @@ function recalculerPrix() {
   } else if (type === 'garde_corps') {
     const idx = ligneEnCours.gcIdx;
     const long = parseFloat(document.getElementById('gc-long')?.value) || 0;
+    const haut = parseFloat(document.getElementById('gc-haut')?.value) || 1000;
     if (idx !== null && long > 0) {
       const ml = long / 1000;
       const gc = DATA_GARDE_CORPS[idx];
-      prixU = ml * gc.prix_ml;
+      const coefHauteur = haut / 1000; // 1000mm = référence, 1100mm = 1.1
+      prixU = ml * gc.prix_ml * coefHauteur;
+      // Surface garde-corps estimée : longueur × hauteur × 2 faces
+      if (metalActif) metalM2 = ml * (haut/1000) * 2 * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
-      detail = `${ml.toFixed(3)} ml × ${gc.prix_ml} €/ml`;
+      const coefStr = coefHauteur !== 1 ? ` × ${coefHauteur.toFixed(2)} (H=${haut}mm)` : '';
+      detail = `${ml.toFixed(3)} ml × ${gc.prix_ml} €/ml${coefStr}`;
     }
 
   } else if (type === 'profils') {
@@ -5206,6 +5297,8 @@ function recalculerPrix() {
       const profil = DATA_PROFILS[dimIdx];
       const ml = long / 1000;
       prixU = ml * profil.prix_ml;
+      // Surface profil estimée : périmètre section × longueur
+      if (metalActif) metalM2 = ml * (profil.perimetre_m2 || 0.1) * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${ml.toFixed(3)} ml × ${profil.prix_ml.toFixed(2)} €/ml`;
     }
@@ -5214,6 +5307,7 @@ function recalculerPrix() {
     const idx = ligneEnCours.dfIdx;
     if (idx !== null) {
       prixU = DATA_DIVERS_FIXES[idx].prix_u;
+      if (metalActif) metalM2 = (DATA_DIVERS_FIXES[idx].surface_m2 || 1) * MAJORATION_METALLISATION_M2;
       tempsMin = prixU * 60 / TAUX_H;
       detail = `${prixU} €/u`;
     }
@@ -5224,7 +5318,12 @@ function recalculerPrix() {
     detail = `${prixU} € (saisie manuelle)`;
   }
 
-  const prixLigne = (prixU + metal) * qte;
+  // Coef typologie client
+  const clientSelect = document.getElementById('of-new-client') || document.getElementById('devis-client');
+  const clientNom = clientSelect?.value || '';
+  const coefTypo = coefTypologieClient ? coefTypologieClient(clientNom) : 0;
+  const prixU_renov = prixU * (1 + renov) * (1 + coefTypo/100);
+  const prixLigne = (prixU_renov + metalM2) * qte;
   const display = document.getElementById('calc-prix-display');
   const detailEl = document.getElementById('calc-detail');
   const tempsEl = document.getElementById('calc-temps-display');
@@ -5235,7 +5334,9 @@ function recalculerPrix() {
   }
   if (detailEl) {
     let detailStr = detail || '—';
-    if (metal > 0) detailStr += ` + ${metal}€ métal.`;
+    if (coefTypo !== 0) detailStr += ' ' + (coefTypo > 0 ? '+' : '') + coefTypo + '% typo.';
+    if (renov > 0) detailStr += ' +20% rénov.';
+    if (metalM2 > 0) detailStr += ` + ${metalM2.toFixed(2)}€ métal. (${(metalM2/MAJORATION_METALLISATION_M2).toFixed(2)}m²)`;
     if (qte > 1) detailStr += ` × qté ${qte}`;
     detailEl.textContent = detailStr;
   }
@@ -5246,11 +5347,12 @@ function recalculerPrix() {
     tempsEl.textContent = `⏱ Temps prévu : ${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'min' : ''}`;
   }
 
-  ligneEnCours.prixU = prixU;
+  ligneEnCours.prixU = prixU_renov;
+  ligneEnCours.renovation = renov > 0;
   ligneEnCours.prixTotal = prixLigne;
   ligneEnCours.detail = detail;
   ligneEnCours.qte = qte;
-  ligneEnCours.metal = metal > 0;
+  ligneEnCours.metal = metalActif;
   ligneEnCours.temps = tempsMin * qte;
 }
 
@@ -5300,6 +5402,7 @@ function ajouterLigneOF() {
     desig = document.getElementById('ligne-desig')?.value || ligneEnCours.type;
   }
   if (ligneEnCours.metal) desig += ' + métallisation';
+  if (ligneEnCours.renovation) desig += ' (rénovation)';
 
   closeModal('modal-calc-ouvrage');
 
@@ -5339,6 +5442,7 @@ function ajouterLigneOF() {
       ralHex,
       fin:         finition,
       metal:       ligneEnCours.metal || false,
+      renovation:  ligneEnCours.renovation || false,
       pu:          ligneEnCours.prixU,
       total:       ligneEnCours.prixTotal,
       temps:       ligneEnCours.temps,
@@ -5352,6 +5456,7 @@ function ajouterLigneOF() {
       ralCode, ralHex, ralNom, finition,
       prixU: ligneEnCours.prixU, prixTotal: ligneEnCours.prixTotal,
       detail: ligneEnCours.detail, temps: ligneEnCours.temps, metal: ligneEnCours.metal,
+      renovation: ligneEnCours.renovation || false,
     };
     lignesOF.push(ligne);
     renderLignesOF();
@@ -5405,7 +5510,7 @@ function renderLignesOF() {
     }
     return `<tr>
       <td>${i+1}</td>
-      <td>${l.designation}</td>
+      <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
       <td style="text-align:center">${l.qte}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
@@ -5669,7 +5774,7 @@ function renderOFTable() {
           const th = Math.floor((l.temps||0)/60), tm = (l.temps||0)%60;
           return `<tr>
             <td style="color:var(--gray-400)">${l.num}</td>
-            <td>${l.designation}</td>
+            <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 6px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
             <td style="text-align:center">${l.qte}</td>
             <td><div style="display:flex;align-items:center;gap:5px">
               <div style="width:12px;height:12px;border-radius:50%;background:${l.ralHex||of.ralHex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></div>
@@ -6146,6 +6251,7 @@ function creerIntervention() {
 
   // Mettre à jour le badge menu
   updateMaintBadge();
+  API.save('/api/planning', planningTaches);
 
   closeModal('modal-new-maintenance');
 
@@ -6502,6 +6608,8 @@ function sauvegarderSalarie() {
     data.forEach(s => SALARIES_APP.push(s));
     renderSalaries();
     buildLoginScreen();
+  renderTypologies();
+  peuplerSelectTypologie();
     showToast('✅ ' + (prenom||'') + ' ' + nom + ' sauvegardé', 'var(--success)');
   }).catch(() => showToast('❌ Erreur sauvegarde', 'var(--danger)'));
 }
@@ -6646,12 +6754,20 @@ function renderDashboard() {
 function buildLoginScreen() {
   const list = document.getElementById('login-profiles-list');
   if (!list) return;
+  // Si déjà connecté avec des données, juste re-render
+  if (currentRole && SALARIES_APP.length > 0) {
+    _renderLoginProfiles();
+    return;
+  }
   list.innerHTML = '<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:10px">Chargement...</div>';
   fetch('/api/salaries-public')
     .then(r => r.ok ? r.json() : [])
     .then(data => {
-      SALARIES_APP.length = 0;
-      data.forEach(s => SALARIES_APP.push(s));
+      // Ne mettre à jour SALARIES_APP que si on n'a pas encore de données avec PINs
+      if (!SALARIES_APP.some(s => s.pin)) {
+        SALARIES_APP.length = 0;
+        data.forEach(s => SALARIES_APP.push(s));
+      }
       _renderLoginProfiles();
     })
     .catch(() => {
@@ -6667,7 +6783,7 @@ function _renderLoginProfiles() {
   const roleBadgeClass = { admin: 'badge-admin', resp_prod: 'badge-prod', operateur: 'badge-op' };
   list.innerHTML = SALARIES_APP.filter(s => s.actif && s.id > 0 && s.id < 999).map(s => {
     const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
-    return `<button class="profile-btn" data-pin="${s.pin}" onclick="demanderMotDePasse(this.dataset.pin)">
+    return `<button class="profile-btn" data-salid="${s.id}" onclick="demanderMotDePasse(parseInt(this.dataset.salid))">
       <div class="profile-avatar" style="background:${s.couleur}">${s.initiales}</div>
       <div class="profile-info">
         <div class="profile-name">${nom}</div>
@@ -6678,12 +6794,12 @@ function _renderLoginProfiles() {
   }).join('');
 }
 
-let _loginPinEnAttente = null;
+let _loginSalId = null; // id du salarié en cours de login
 
-function demanderMotDePasse(pin) {
-  const s = SALARIES_APP.find(x => x.pin === pin && x.actif);
+function demanderMotDePasse(salId) {
+  const s = SALARIES_APP.find(x => x.id === salId && x.actif);
   if (!s) return;
-  _loginPinEnAttente = pin;
+  _loginSalId = salId;
 
   const nom = s.prenom ? `${s.prenom} ${s.nom}` : s.nom;
   const roleLabel = { admin:'⚡ Admin', resp_prod:'🏭 Resp. Production', operateur:'🎨 Opérateur' };
@@ -6701,14 +6817,14 @@ function demanderMotDePasse(pin) {
   setTimeout(() => document.getElementById('login-pwd-input')?.focus(), 200);
 }
 
-function validerMotDePasse() {
+async function validerMotDePasse() {
   const saisi = document.getElementById('login-pwd-input')?.value?.trim();
   const errEl  = document.getElementById('login-pwd-error');
-
   if (!saisi) { errEl.style.display = 'block'; return; }
 
-  const s = SALARIES_APP.find(x => x.pin === _loginPinEnAttente && x.actif);
-  if (!s || saisi !== s.pin) {
+  // Vérifier le PIN via Railway
+  const ok = await API.login(saisi);
+  if (!ok) {
     errEl.style.display = 'block';
     document.getElementById('login-pwd-input').value = '';
     document.getElementById('login-pwd-input').focus();
@@ -6717,8 +6833,15 @@ function validerMotDePasse() {
 
   errEl.style.display = 'none';
   closeModal('modal-login-pwd');
-  connecterParPin(_loginPinEnAttente);
-  _loginPinEnAttente = null;
+
+  // Charger les données et connecter
+  await API.loadAll();
+  const s = SALARIES_APP.find(x => x.id === _loginSalId && x.actif);
+  if (s) {
+    if (!s.pin) s.pin = saisi;
+    connecterParPin(saisi);
+  }
+  _loginSalId = null;
 }
 
 function connecterParPin(pin) {
@@ -7106,7 +7229,12 @@ function appliquerEtatOF(ref, nouvelEtat, selectEl, ancienEtat) {
   if (!of) return;
   of.etat      = nouvelEtat;
   of.etatBadge = ETATS_OF[nouvelEtat]?.badge || 'badge-gray';
-  API.save('/api/of/' + ref, of);
+  // Sauvegarde synchrone pour éviter que la sync 5s n'écrase l'état
+  fetch('/api/of/' + ref, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(of)
+  });
   if (selectEl) {
     selectEl.value = nouvelEtat;
     const cfg = ETATS_OF[nouvelEtat];
@@ -7239,6 +7367,7 @@ function imprimerOF(ref) {
       <td>RAL ${l.ral}</td>
       <td>${l.fin}</td>
       <td style="text-align:center">${l.metal ? 'Oui' : '—'}</td>
+      <td style="text-align:center;font-weight:700;color:${l.renovation?'#a16207':'#94a3b8'}">${l.renovation ? '🔧' : '—'}</td>
       <td style="text-align:right">${l.pu.toLocaleString('fr-FR',{minimumFractionDigits:2})} €</td>
       <td style="text-align:right"><strong>${l.total.toLocaleString('fr-FR',{minimumFractionDigits:2})} €</strong></td>
       <td style="text-align:center">${lh>0?lh+'h':''}${lm>0?lm+'min':'—'}</td>
@@ -7303,12 +7432,12 @@ function imprimerOF(ref) {
 <table>
   <thead><tr>
     <th>#</th><th>Désignation</th><th style="text-align:center">Qté</th>
-    <th>Couleur</th><th>Finition</th><th style="text-align:center">Métal.</th>
+    <th>Couleur</th><th>Finition</th><th style="text-align:center">Métal.</th><th style="text-align:center">Réno</th>
     <th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th><th style="text-align:center">Temps</th>
   </tr></thead>
   <tbody>${lignesHTML}</tbody>
   <tfoot><tr>
-    <td colspan="7" style="text-align:right">TOTAL HT</td>
+    <td colspan="8" style="text-align:right">TOTAL HT</td>
     <td style="text-align:right;font-size:13px;color:#1d4ed8">${totalStr} €</td>
     <td style="text-align:center">${tempsStr}</td>
   </tr></tfoot>
@@ -7685,6 +7814,7 @@ function ouvrirNouveauClient() {
   ['client-societe','client-nom','client-prenom','client-tel','client-email'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  peuplerSelectTypologie();
   document.getElementById('client-error').style.display = 'none';
   const btn = document.getElementById('client-submit-btn');
   if (btn) btn.textContent = '💾 Créer le client';
@@ -7701,6 +7831,8 @@ function ouvrirEditClient(id) {
   document.getElementById('client-prenom').value  = c.prenom || '';
   document.getElementById('client-tel').value     = c.tel || '';
   document.getElementById('client-email').value   = c.email || '';
+  peuplerSelectTypologie();
+  if (document.getElementById('client-typologie')) document.getElementById('client-typologie').value = c.typologieId || '';
   document.getElementById('client-error').style.display = 'none';
   const btn = document.getElementById('client-submit-btn');
   if (btn) btn.textContent = '💾 Enregistrer';
@@ -7720,17 +7852,24 @@ function sauvegarderClient() {
   if (doublon) { errEl.textContent='⚠️ Ce client existe déjà'; errEl.style.display='block'; return; }
   errEl.style.display = 'none';
 
+  const typologieId = document.getElementById('client-typologie')?.value || '';
   if (_clientEditId) {
     const idx = CLIENTS_DATA.findIndex(c => c.id === _clientEditId);
-    if (idx !== -1) CLIENTS_DATA[idx] = { ...CLIENTS_DATA[idx], societe, nom, prenom, tel, email };
-    showToast(`✅ ${societe} mis à jour`, 'var(--success)');
+    if (idx !== -1) CLIENTS_DATA[idx] = { ...CLIENTS_DATA[idx], societe, nom, prenom, tel, email, typologieId };
   } else {
-    CLIENTS_DATA.push({ id: nextClientId++, societe, nom, prenom, tel, email });
-    showToast(`✅ ${societe} ajouté`, 'var(--success)');
+    CLIENTS_DATA.push({ id: nextClientId++, societe, nom, prenom, tel, email, typologieId });
   }
   closeModal('modal-new-client');
-  renderClients();
-  API.save('/api/clients', CLIENTS_DATA);
+  // Sauvegarder sur Railway et recharger
+  fetch('/api/clients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(CLIENTS_DATA)
+  }).then(r => r.json()).then(() => {
+    renderClients();
+    updateClientSelects();
+    showToast('✅ ' + societe + ' sauvegardé', 'var(--success)');
+  }).catch(() => showToast('❌ Erreur sauvegarde client', 'var(--danger)'));
 }
 
 function supprimerClient(id) {
@@ -7738,9 +7877,11 @@ function supprimerClient(id) {
   if (!c) return;
   if (!confirm(`Supprimer "${c.societe}" ?`)) return;
   CLIENTS_DATA.splice(CLIENTS_DATA.findIndex(x=>x.id===id), 1);
-  renderClients();
-  API.save('/api/clients', CLIENTS_DATA);
-  showToast(`🗑 ${c.societe} supprimé`, 'var(--danger)');
+  fetch('/api/clients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(CLIENTS_DATA)
+  }).then(() => { renderClients(); showToast('🗑 ' + c.societe + ' supprimé', 'var(--danger)'); });
 }
 
 // ═══════════════════════════════════════════════
@@ -7792,9 +7933,11 @@ function ajouterFournisseur() {
   errEl.style.display = 'none';
   FOURNISSEURS.push({ id: nextFournId++, nom });
   input.value = '';
-  renderFournisseurs();
-  API.save('/api/fournisseurs', FOURNISSEURS);
-  showToast(`✅ ${nom} ajouté`, 'var(--success)');
+  fetch('/api/fournisseurs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(FOURNISSEURS)
+  }).then(() => { renderFournisseurs(); showToast('✅ ' + nom + ' ajouté', 'var(--success)'); });
 }
 
 function supprimerFournisseur(id) {
@@ -7802,9 +7945,11 @@ function supprimerFournisseur(id) {
   if (!f) return;
   if (!confirm(`Supprimer "${f.nom}" ?`)) return;
   FOURNISSEURS = FOURNISSEURS.filter(x => x.id !== id);
-  renderFournisseurs();
-  API.save('/api/fournisseurs', FOURNISSEURS);
-  showToast(`🗑 ${f.nom} supprimé`, 'var(--danger)');
+  fetch('/api/fournisseurs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(FOURNISSEURS)
+  }).then(() => { renderFournisseurs(); showToast('🗑 ' + f.nom + ' supprimé', 'var(--danger)'); });
 }
 
 function ouvrirGestionFournisseurs() {
@@ -8219,6 +8364,8 @@ function convertirDevisEnOF(devisRef) {
 
   renderDevis();
   renderOFTable();
+  API.save('/api/of/' + ref, OF_DATA[ref]);
+  DEVIS_DATA.forEach(d => API.save('/api/devis/' + d.ref, d));
   updateOFBadge();
 
   showToast(`✅ ${ref} créé depuis ${devisRef} — délai proposé : ${delaiStr}`, 'var(--success)');
@@ -9354,6 +9501,7 @@ function sauvegarderMesure(continuer) {
   renderRH();
   renderStock();
   renderDevis();
+  API.post('/api/saisies', mesuresProduction[mesuresProduction.length-1]);
   showToast(`✅ Mesure enregistrée — ${operation} sur ${type} (${tpu.toFixed(1)} min/${unite})`, 'var(--success)');
 
   if (continuer) {
@@ -9372,6 +9520,7 @@ function sauvegarderMesure(continuer) {
 
 function supprimerMesure(id) {
   mesuresProduction = mesuresProduction.filter(m => m.id !== id);
+  API.save('/api/planning', planningTaches);
   renderAnalyse();
   renderRH();
   renderStock();
@@ -9934,6 +10083,7 @@ function confirmerPlanifOF() {
   salariesCoches.forEach(sal => ordonnannerSalarie(sal, dateDebutVal));
 
   renderPlanning();
+  API.save('/api/planning', planningTaches);
   closeModal('modal-planif-of');
 
   const tempsTotal = of.lignes.reduce((s, l) => s + (l.temps || 0), 0);
@@ -9961,7 +10111,7 @@ function retirerOFDuPlanning(ref) {
     const dateDebut = OF_DATA[ref]?.dateDebutPlanif || dateToKey(new Date());
     ordonnannerSalarie(s, dateDebut);
   });
-  if (planningTaches.length !== avant) renderPlanning();
+  if (planningTaches.length !== avant) { renderPlanning(); API.save('/api/planning', planningTaches); }
 }
 
 function showToast(msg, color) {
@@ -10296,7 +10446,11 @@ function enregistrerTemps(fromModal) {
   updateSaveBtn();
 
   // Toast
-  const msg = document.createElement('div');
+  // Sync Railway
+  if (API.isOnline()) SAISIES_TEMPS.slice(-chronoOFSelectionnes.size).forEach(s => API.post('/api/saisies', s));
+  renderOFTable();
+
+    const msg = document.createElement('div');
   msg.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--success);color:white;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:fadeInUp 0.2s ease';
   msg.textContent = `✅ ${dureeLabel} enregistrés — ${ofLabel}`;
   document.body.appendChild(msg);
@@ -10428,7 +10582,7 @@ const API = (() => {
     if (!_online || !_token) return false;
     setIndicator('syncing');
     try {
-      const [ofs, devis, stock, saisies, planning, controles, consos, salaries] = await Promise.all([
+      const [ofs, devis, stock, saisies, planning, controles, consos, salaries, clients, fournisseurs] = await Promise.all([
         request('GET', '/api/of'),
         request('GET', '/api/devis'),
         request('GET', '/api/stock'),
@@ -10437,6 +10591,8 @@ const API = (() => {
         request('GET', '/api/controles'),
         request('GET', '/api/conso-poudre'),
         request('GET', '/api/salaries'),
+        request('GET', '/api/clients'),
+        request('GET', '/api/fournisseurs'),
       ]);
 
       // Mettre à jour toutes les données en mémoire
@@ -10451,10 +10607,12 @@ const API = (() => {
       restore(planningTaches, planning);
       restore(HISTORIQUE_CONTROLE, controles);
       restore(HISTORIQUE_CONSO, consos);
+      restore(CLIENTS_DATA, clients);
+      restore(FOURNISSEURS, fournisseurs);
       if (Array.isArray(salaries) && salaries.length) {
         SALARIES_APP.length = 0;
         salaries.forEach(s => SALARIES_APP.push(s));
-        buildLoginScreen();
+        // Ne pas appeler buildLoginScreen ici — ça écraserait SALARIES_APP avec /api/salaries-public (sans PINs)
       }
 
       // Mettre à jour les compteurs
@@ -10464,7 +10622,7 @@ const API = (() => {
         if (maxOf >= nextOFNum) nextOFNum = maxOf + 1;
       }
 
-      renderOFTable(); renderPlanning(); renderStock();
+      renderOFTable(); renderOFTermines(); renderPlanning(); renderStock();
       renderDevis(); renderAnalyse(); renderRH(); renderSalaries(); updateOFBadge();
       setIndicator('online');
       return true;
@@ -10490,10 +10648,10 @@ const API = (() => {
     try { await request('PUT', '/api/salaries-app', SALARIES_APP); } catch(e) {}
   }
 
-  // Sync auto 30s
+  // Sync auto 5s
   setInterval(async () => {
     if (_online && _token) try { await loadAll(); } catch(e) {}
-  }, 30000);
+  }, 5000);
 
   return { login, save, post, loadAll, isOnline: () => _online, setIndicator, syncSalaries };
 })();
@@ -10656,6 +10814,147 @@ async function effacerConnexions() {
   _connexionsData = [];
   renderConnexions();
   showToast('🗑 Historique effacé', 'var(--danger)');
+}
+
+
+// ═══════════════════════════════════════════════════════
+// MODAL RAPIDE RAL
+// ═══════════════════════════════════════════════════════
+let _rapideRalTargetId = null;
+
+function ouvrirModalRapideRAL(selectId) {
+  _rapideRalTargetId = selectId;
+  document.getElementById('rapide-ral-code').value = '';
+  document.getElementById('rapide-ral-nom').value = '';
+  document.getElementById('rapide-ral-hex').value = '#888888';
+  document.getElementById('rapide-ral-preview').style.background = '#888888';
+  document.getElementById('rapide-ral-error').style.display = 'none';
+  openModal('modal-rapide-ral');
+  setTimeout(() => document.getElementById('rapide-ral-code')?.focus(), 200);
+}
+
+function previewRapideRAL() {
+  const code = document.getElementById('rapide-ral-code')?.value?.trim();
+  const prev = document.getElementById('rapide-ral-preview');
+  if (prev) prev.textContent = code ? 'RAL ' + code : '';
+}
+
+function confirmerRapideRAL() {
+  const ral = document.getElementById('rapide-ral-code')?.value?.trim();
+  const nom = document.getElementById('rapide-ral-nom')?.value?.trim() || '';
+  const fin = document.getElementById('rapide-ral-fin')?.value || 'Mat 30%';
+  const hex = document.getElementById('rapide-ral-hex')?.value || '#888888';
+  const errEl = document.getElementById('rapide-ral-error');
+
+  if (!ral) { errEl.textContent = '⚠️ Code RAL obligatoire'; errEl.style.display = 'block'; return; }
+  if (STOCK_DATA.find(s => s.ral === ral && s.finition === fin)) {
+    errEl.textContent = '⚠️ Ce RAL avec cette finition existe déjà'; errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+
+  // Ajouter au stock
+  const newId = Math.max(0, ...STOCK_DATA.map(s => s.id||0)) + 1;
+  const newItem = { id: newId, ral, nom, finition: fin, hex, fournisseur: '—', quantite: 0, lots: 0, lotsDetail: [], peremption: '', seuilAlerte: 1 };
+  STOCK_DATA.push(newItem);
+
+  // Sauvegarder sur Railway
+  fetch('/api/stock', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(STOCK_DATA)
+  });
+
+  closeModal('modal-rapide-ral');
+
+  // Reconstruire le select RAL et sélectionner le nouveau
+  const wrap = document.getElementById(_rapideRalTargetId)?.closest('[style*="display:flex"]');
+  if (wrap) {
+    const newHtml = buildRALSelect(_rapideRalTargetId);
+    const div = document.createElement('div');
+    div.innerHTML = newHtml;
+    wrap.replaceWith(div.firstElementChild);
+  }
+  // Sélectionner le nouveau RAL
+  setTimeout(() => {
+    const sel = document.getElementById(_rapideRalTargetId);
+    if (sel) { sel.value = ral; recalculerPrix(); }
+  }, 100);
+
+  showToast('✅ RAL ' + ral + ' ' + nom + ' ajouté au stock', 'var(--success)');
+}
+
+
+// ═══════════════════════════════════════════════════════
+// TYPOLOGIES CLIENTS
+// ═══════════════════════════════════════════════════════
+
+let TYPOLOGIES_CLIENTS = [
+  { id: 1, nom: 'Particulier',  coef: 20  },  // +20%
+  { id: 2, nom: 'Métallier',    coef: 0   },  // prix normal
+  { id: 3, nom: 'Industriel',   coef: -5  },  // -5%
+];
+let nextTypologieId = 4;
+
+function renderTypologies() {
+  const container = document.getElementById('typologies-liste');
+  if (!container) return;
+  container.innerHTML = TYPOLOGIES_CLIENTS.map(t => {
+    const coefStr = t.coef > 0 ? '+'+t.coef+'%' : t.coef < 0 ? t.coef+'%' : 'Prix normal';
+    const coefColor = t.coef > 0 ? 'var(--success)' : t.coef < 0 ? 'var(--blue-accent)' : 'var(--gray-400)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--gray-100)">
+      <div style="flex:1;font-weight:600;font-size:14px">${t.nom}</div>
+      <input type="number" value="${t.coef}" step="1" min="-50" max="100"
+        style="width:80px;text-align:center;padding:4px 8px;border:1.5px solid var(--gray-200);border-radius:6px;font-size:13px;font-weight:700"
+        onchange="modifierCoefTypologie(${t.id}, this.value)">
+      <span style="font-size:12px;font-weight:700;color:${coefColor};min-width:70px">${coefStr}</span>
+      ${TYPOLOGIES_CLIENTS.length > 1 ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="supprimerTypologie(${t.id})">🗑</button>` : ''}
+    </div>`;
+  }).join('') + `<div style="margin-top:12px;font-size:11px;color:var(--gray-400)">
+    💡 Valeurs en % appliquées automatiquement sur le prix lors de la création d'OF/devis
+  </div>`;
+}
+
+function ajouterTypologie() {
+  const nom = prompt('Nom de la nouvelle typologie :');
+  if (!nom?.trim()) return;
+  const coef = parseFloat(prompt('Coefficient en % (ex: 10 pour +10%, -5 pour -5%, 0 pour prix normal) :') || '0');
+  TYPOLOGIES_CLIENTS.push({ id: nextTypologieId++, nom: nom.trim(), coef: isNaN(coef) ? 0 : coef });
+  renderTypologies();
+  peuplerSelectTypologie();
+  showToast('✅ Typologie ajoutée', 'var(--success)');
+}
+
+function modifierCoefTypologie(id, val) {
+  const t = TYPOLOGIES_CLIENTS.find(x => x.id === id);
+  if (t) { t.coef = parseFloat(val) || 0; renderTypologies(); peuplerSelectTypologie(); }
+}
+
+function supprimerTypologie(id) {
+  if (!confirm('Supprimer cette typologie ?')) return;
+  TYPOLOGIES_CLIENTS = TYPOLOGIES_CLIENTS.filter(x => x.id !== id);
+  renderTypologies();
+  peuplerSelectTypologie();
+  showToast('🗑 Typologie supprimée', 'var(--danger)');
+}
+
+function peuplerSelectTypologie() {
+  const sel = document.getElementById('client-typologie');
+  if (!sel) return;
+  const val = sel.value;
+  sel.innerHTML = '<option value="">— Aucune —</option>' +
+    TYPOLOGIES_CLIENTS.map(t => {
+      const coefStr = t.coef > 0 ? ' (+'+t.coef+'%)' : t.coef < 0 ? ' ('+t.coef+'%)' : '';
+      return `<option value="${t.id}">${t.nom}${coefStr}</option>`;
+    }).join('');
+  if (val) sel.value = val;
+}
+
+// Coefficient applicable au client sélectionné dans un OF/devis
+function coefTypologieClient(nomSociete) {
+  const c = CLIENTS_DATA.find(x => x.societe === nomSociete);
+  if (!c?.typologieId) return 0;
+  const t = TYPOLOGIES_CLIENTS.find(x => x.id === parseInt(c.typologieId));
+  return t ? t.coef : 0;
 }
 
 

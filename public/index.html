@@ -4416,7 +4416,7 @@ function openOFDetail(ref) {
     const th = Math.floor(l.temps/60), tm = l.temps%60;
     return `<tr>
       <td style="color:var(--gray-400)">${l.num}</td>
-      <td>${l.designation}</td>
+      <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
       <td style="text-align:center">${l.qte}</td>
       <td><div style="display:flex;align-items:center;gap:5px">
         <div style="width:12px;height:12px;border-radius:50%;background:${l.ralHex||of.ralHex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></div>
@@ -5507,7 +5507,7 @@ function renderLignesOF() {
     }
     return `<tr>
       <td>${i+1}</td>
-      <td>${l.designation}</td>
+      <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
       <td style="text-align:center">${l.qte}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
@@ -5771,7 +5771,7 @@ function renderOFTable() {
           const th = Math.floor((l.temps||0)/60), tm = (l.temps||0)%60;
           return `<tr>
             <td style="color:var(--gray-400)">${l.num}</td>
-            <td>${l.designation}</td>
+            <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 6px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
             <td style="text-align:center">${l.qte}</td>
             <td><div style="display:flex;align-items:center;gap:5px">
               <div style="width:12px;height:12px;border-radius:50%;background:${l.ralHex||of.ralHex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></div>
@@ -7226,7 +7226,12 @@ function appliquerEtatOF(ref, nouvelEtat, selectEl, ancienEtat) {
   if (!of) return;
   of.etat      = nouvelEtat;
   of.etatBadge = ETATS_OF[nouvelEtat]?.badge || 'badge-gray';
-  API.save('/api/of/' + ref, of);
+  // Sauvegarde synchrone pour éviter que la sync 5s n'écrase l'état
+  fetch('/api/of/' + ref, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('thermo_token') },
+    body: JSON.stringify(of)
+  });
   if (selectEl) {
     selectEl.value = nouvelEtat;
     const cfg = ETATS_OF[nouvelEtat];
@@ -7354,7 +7359,7 @@ function imprimerOF(ref) {
     const lh = Math.floor((l.temps||0)/60), lm = (l.temps||0)%60;
     return `<tr>
       <td>${l.num}</td>
-      <td>${l.designation}</td>
+      <td>${l.designation}${l.renovation?' <span style="font-size:9px;background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:8px;font-weight:700">🔧 Réno</span>':''}</td>
       <td style="text-align:center">${l.qte}</td>
       <td>RAL ${l.ral}</td>
       <td>${l.fin}</td>

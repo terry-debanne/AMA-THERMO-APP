@@ -4063,23 +4063,7 @@ body {
         <label class="form-label">Assigner à *</label>
         <div style="display:flex;flex-direction:column;gap:8px" id="planif-salaries-list">
 
-          <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--gray-200);cursor:pointer;transition:all 0.1s" id="planif-lbl-dylan">
-            <input type="checkbox" class="planif-sal-chk" value="dylan" onchange="updatePlanifLabel('dylan')">
-            <div style="width:34px;height:34px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:800;font-size:14px;color:white;flex-shrink:0">DT</div>
-            <div>
-              <div style="font-weight:700;font-size:13px;color:var(--blue-dark)">Dylan TASSEZ</div>
-              <div style="font-size:11px;color:var(--gray-400)">Resp. Production</div>
-            </div>
-          </label>
-
-          <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--gray-200);cursor:pointer;transition:all 0.1s" id="planif-lbl-mickael">
-            <input type="checkbox" class="planif-sal-chk" value="mickael" onchange="updatePlanifLabel('mickael')">
-            <div style="width:34px;height:34px;border-radius:50%;background:#0891b2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:800;font-size:14px;color:white;flex-shrink:0">MB</div>
-            <div>
-              <div style="font-weight:700;font-size:13px;color:var(--blue-dark)">Mickaël BUTEZ</div>
-              <div style="font-size:11px;color:var(--gray-400)">Peintre</div>
-            </div>
-          </label>
+          <!-- généré dynamiquement par buildPlanifSalaries() -->
 
         </div>
         <div style="font-size:11px;color:var(--blue-accent);margin-top:6px">
@@ -10073,12 +10057,32 @@ function ajouterOFAuPlanning(ref, of) {
   }
   if (dateEl) dateEl.value = dateToKey(prochainJourOuvre(new Date()));
 
-  document.querySelectorAll('.planif-sal-chk').forEach(chk => {
-    chk.checked = false;
-    updatePlanifLabel(chk.value);
-  });
+  // Construire la liste des salariés depuis SALARIES_APP
+  buildPlanifSalaries();
 
   openModal('modal-planif-of');
+}
+
+function buildPlanifSalaries() {
+  const container = document.getElementById('planif-salaries-list');
+  if (!container) return;
+  const sals = SALARIES_APP.filter(s => s.actif && s.role !== 'admin' && s.id > 0 && s.id < 999);
+  if (!sals.length) {
+    container.innerHTML = '<div style="color:var(--gray-400);font-size:12px">Aucun salarié actif</div>';
+    return;
+  }
+  container.innerHTML = sals.map(s => {
+    const nom = s.prenom ? s.prenom + ' ' + s.nom : s.nom;
+    const id = 'sal_' + s.id;
+    return `<label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--gray-200);cursor:pointer;transition:all 0.1s" id="planif-lbl-${id}">
+      <input type="checkbox" class="planif-sal-chk" value="${id}" onchange="updatePlanifLabel('${id}')">
+      <div style="width:34px;height:34px;border-radius:50%;background:${s.couleur||'var(--blue-mid)'};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:800;font-size:14px;color:white;flex-shrink:0">${s.initiales||nom.slice(0,2).toUpperCase()}</div>
+      <div>
+        <div style="font-weight:700;font-size:13px;color:var(--blue-dark)">${nom}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${s.poste||s.role}</div>
+      </div>
+    </label>`;
+  }).join('');
 }
 
 function confirmerPlanifOF() {
@@ -10317,12 +10321,18 @@ function renderChronoOFList() {
   const container = document.getElementById('chrono-of-list');
   if (!container) return;
 
-  if (OF_EN_COURS.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">Aucun OF en cours</div>';
+  // Utiliser OF_DATA directement — tous les OF non terminés
+  const ofDispos = Object.values(OF_DATA)
+    .filter(o => o.etat === 'Lancé' || o.etat === 'En attente' || o.etat === 'Non lancé')
+    .sort((a,b) => { const ord={'Lancé':0,'En attente':1,'Non lancé':2}; return (ord[a.etat]||3)-(ord[b.etat]||3); })
+    .map(o => ({ ref:o.ref, client:o.client, etat:o.etat, urgence:o.delaiUrgent||false }));
+
+  if (ofDispos.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">Aucun OF disponible</div>';
     return;
   }
 
-  container.innerHTML = OF_EN_COURS.map(of => {
+  container.innerHTML = ofDispos.map(of => {
     const sel = chronoOFSelectionnes.has(of.ref);
     const urgStyle = of.urgence ? 'border-left:3px solid var(--orange);' : '';
 

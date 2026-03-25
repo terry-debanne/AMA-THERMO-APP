@@ -10296,6 +10296,10 @@ let totalSecondesJour = 0;
 
 // Appelé à chaque connexion pour mettre à jour la page chrono
 function initChronoPage() {
+  // Toujours afficher les OF — même si le profil n'est pas encore chargé
+  renderChronoOFList();
+  updateSaveBtn();
+
   const profil = currentRole ? PROFILS[currentRole] : null;
   if (!profil) return;
 
@@ -10314,7 +10318,6 @@ function initChronoPage() {
   // Réinitialiser la sélection
   chronoOFSelectionnes.clear();
   renderChronoOFList();
-  updateSaveBtn();
 }
 
 function renderChronoOFList() {

@@ -10324,9 +10324,13 @@ function renderChronoOFList() {
   const container = document.getElementById('chrono-of-list');
   if (!container) return;
 
-  // Utiliser OF_DATA directement — tous les OF non terminés
+  // Opérateur : uniquement les OF Lancés
+  // Admin/resp_prod : aussi En attente et Non lancé (pour prendre de l'avance)
+  const isOp = currentRole === 'operateur';
   const ofDispos = Object.values(OF_DATA)
-    .filter(o => o.etat === 'Lancé' || o.etat === 'En attente' || o.etat === 'Non lancé')
+    .filter(o => isOp
+      ? o.etat === 'Lancé'
+      : o.etat === 'Lancé' || o.etat === 'En attente' || o.etat === 'Non lancé')
     .sort((a,b) => { const ord={'Lancé':0,'En attente':1,'Non lancé':2}; return (ord[a.etat]||3)-(ord[b.etat]||3); })
     .map(o => ({ ref:o.ref, client:o.client, etat:o.etat, urgence:o.delaiUrgent||false }));
 

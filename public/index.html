@@ -1401,21 +1401,7 @@ body {
   margin-top: 10px;
   display: none;
 }
-/* Mode invité — lecture seule */
-body.mode-invite .btn-primary,
-body.mode-invite .btn-danger,
-body.mode-invite #btn-nouvel-of,
-body.mode-invite #btn-new-devis,
-body.mode-invite .btn-add,
-body.mode-invite [onclick*="creerOF"],
-body.mode-invite [onclick*="sauvegarder"],
-body.mode-invite [onclick*="supprimer"],
-body.mode-invite [onclick*="ajouter"],
-body.mode-invite [onclick*="confirmer"],
-body.mode-invite .of-actions .btn-secondary,
-body.mode-invite select.etat-select {
-  display: none !important;
-}
+/* Mode invité — bac à sable (peut créer mais rien n'est sauvegardé) */
 body.mode-invite::before {
   content: '👁 Mode consultation — lecture seule';
   position: fixed;

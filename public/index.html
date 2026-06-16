@@ -6929,8 +6929,20 @@ function _connecterAvecProfil(profil, salarie) {
   // Appliquer le mode invité
   if (profil.role === 'invite') {
     document.body.classList.add('mode-invite');
+    // Bloquer tous les fetch PUT/POST/DELETE en mode invité
+    if (!window._fetchOrig) {
+      window._fetchOrig = window.fetch;
+      window.fetch = function(url, opts) {
+        if (currentRole === 'invite' && opts?.method && ['PUT','POST','DELETE'].includes(opts.method.toUpperCase())) {
+          return Promise.resolve(new Response(JSON.stringify({ok:true, invite:true}), {status:200, headers:{'Content-Type':'application/json'}}));
+        }
+        return window._fetchOrig.apply(this, arguments);
+      };
+    }
   } else {
     document.body.classList.remove('mode-invite');
+    // Restaurer fetch normal
+    if (window._fetchOrig) { window.fetch = window._fetchOrig; window._fetchOrig = null; }
   }
   const avatarEl = document.getElementById('user-avatar');
   const nameEl   = document.getElementById('user-name');
@@ -10740,11 +10752,13 @@ const API = (() => {
 
   async function save(path, body) {
     if (!_online || !_token) return;
+    if (currentRole === 'invite') { showToast('👁 Mode invité — modifications non sauvegardées', '#0369a1'); return; } // Mode invité
     try { await request('PUT', path, body); } catch(e) { console.warn('Save failed:', path, e.message); }
   }
 
   async function post(path, body) {
     if (!_online || !_token) return null;
+    if (currentRole === 'invite') return null; // Mode invité — pas de sauvegarde
     try { return await request('POST', path, body); } catch { return null; }
   }
 

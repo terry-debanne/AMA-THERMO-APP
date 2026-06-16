@@ -1401,6 +1401,36 @@ body {
   margin-top: 10px;
   display: none;
 }
+/* Mode invité — lecture seule */
+body.mode-invite .btn-primary,
+body.mode-invite .btn-danger,
+body.mode-invite #btn-nouvel-of,
+body.mode-invite #btn-new-devis,
+body.mode-invite .btn-add,
+body.mode-invite [onclick*="creerOF"],
+body.mode-invite [onclick*="sauvegarder"],
+body.mode-invite [onclick*="supprimer"],
+body.mode-invite [onclick*="ajouter"],
+body.mode-invite [onclick*="confirmer"],
+body.mode-invite .of-actions .btn-secondary,
+body.mode-invite select.etat-select {
+  display: none !important;
+}
+body.mode-invite::before {
+  content: '👁 Mode consultation — lecture seule';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #0369a1;
+  color: white;
+  text-align: center;
+  padding: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 99999;
+}
+
 </style>
 </head>
 <body>
@@ -6417,6 +6447,15 @@ const NAV_PAR_ROLE = {
     { section: 'Consultation' },
     { page: 'stock', icon: '🎨', label: 'Stock poudre', note: 'lecture' },
   ],
+  invite: [
+    { section: 'Consultation' },
+    { page: 'dashboard', icon: '📊', label: 'Tableau de bord' },
+    { page: 'of',        icon: '📋', label: 'Commandes (OF)', note: 'lecture' },
+    { page: 'devis',     icon: '📝', label: 'Devis', note: 'lecture' },
+    { page: 'planning',  icon: '📅', label: 'Planning' },
+    { page: 'clients',   icon: '👥', label: 'Clients', note: 'lecture' },
+    { page: 'stock',     icon: '🎨', label: 'Stock poudre', note: 'lecture' },
+  ],
 };
 
 // Construire PROFILS dynamiquement depuis SALARIES_APP
@@ -6429,7 +6468,7 @@ function buildPROFILS() {
       nom:       s.prenom ? `${s.prenom} ${s.nom}` : s.nom,
       initiales: s.initiales,
       role:      s.role,
-      roleLabel: s.role === 'admin' ? '⚡ Admin' : s.role === 'resp_prod' ? '🏭 Resp. Production' : '🎨 Opérateur',
+      roleLabel: s.role === 'admin' ? '⚡ Admin' : s.role === 'resp_prod' ? '🏭 Resp. Production' : s.role === 'invite' ? '👁 Invité' : '🎨 Opérateur',
       couleur:   s.couleur,
       pin:       s.pin,
       nav:       NAV_PAR_ROLE[s.role] || NAV_PAR_ROLE.operateur,
@@ -6886,6 +6925,12 @@ function loginCode() {
 }
 
 function _connecterAvecProfil(profil, salarie) {
+  // Appliquer le mode invité
+  if (profil.role === 'invite') {
+    document.body.classList.add('mode-invite');
+  } else {
+    document.body.classList.remove('mode-invite');
+  }
   const avatarEl = document.getElementById('user-avatar');
   const nameEl   = document.getElementById('user-name');
   const roleEl   = document.getElementById('user-role');
@@ -6932,6 +6977,7 @@ function buildNav(navDef) {
 
 function deconnecter() {
   currentRole = null;
+  document.body.classList.remove('mode-invite');
   // Réafficher l'écran de connexion
   const loginScreen = document.getElementById('login-screen');
   if (loginScreen) loginScreen.style.display = 'flex';
